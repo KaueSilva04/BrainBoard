@@ -104,14 +104,8 @@ export interface CreateProjectInput {
   settings?: Record<string, unknown>;
 }
 
-export interface UpdateProjectInput {
-  title?: string;
-  description?: string;
-  businessLogic?: string;
-  status?: ProjectStatus;
-  githubRepo?: string;
-  settings?: Record<string, unknown>;
-}
+// DRY: todos os campos de criação são opcionais na atualização
+export type UpdateProjectInput = Partial<CreateProjectInput>;
 
 export interface CreateStageInput {
   title: string;
@@ -119,10 +113,16 @@ export interface CreateStageInput {
   status?: StageStatus;
 }
 
+export type UpdateStageInput = Partial<CreateStageInput>;
+
 export interface CreateTaskInput {
   title: string;
   description?: string;
   status?: TaskStatus;
+}
+
+export interface UpdateTaskStatusInput {
+  status: TaskStatus;
 }
 
 export interface CreateMemberInput {

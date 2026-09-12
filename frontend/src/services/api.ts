@@ -3,6 +3,7 @@ import type {
   ProjectSummary,
   Stage,
   Task,
+  Subtask,
   Member,
   UpdateLog,
   CreateProjectInput,
@@ -14,28 +15,44 @@ import type {
   TaskStatus,
 } from '../types';
 
-const BASE_URL = import.meta.env.VITE_API_URL || '';
+const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
-// ---- Generic fetch helper ----------------------------------
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    ...options,
-  });
+if (import.meta.env.PROD && !import.meta.env.VITE_API_URL) {
+  console.warn('[api] VITE_API_URL não definida em produção. Usando URL relativa.');
+}
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    let message: string;
-    try {
-      message = JSON.parse(body)?.error ?? body;
-    } catch {
-      message = body || res.statusText;
-    }
-    throw new Error(`[${res.status}] ${message}`);
+// ---- Custom error class ------------------------------------
+export class ApiError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
   }
+}
 
-  if (res.status === 204) return undefined as T;
-  return res.json();
+// ---- Generic fetch helper with timeout ---------------------
+async function request<T>(path: string, options?: RequestInit, timeoutMs = 15_000): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(`${BASE_URL}${path}`, {
+      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      signal: controller.signal,
+      ...options,
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      let message: string;
+      try { message = JSON.parse(body)?.error ?? body; } catch { message = body || res.statusText; }
+      throw new ApiError(res.status, message);
+    }
+
+    if (res.status === 204) return undefined as T;
+    return res.json() as Promise<T>;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // ============================================================
@@ -145,17 +162,17 @@ export const tasksApi = {
     return request(`/api/tasks/${id}`, { method: 'DELETE' });
   },
 
-  addSubtask(taskId: string, title: string) {
-    return request(`/api/tasks/${taskId}/subtasks`, {
+  addSubtask(taskId: string, title: string): Promise<Subtask> {
+    return request<Subtask>(`/api/tasks/${taskId}/subtasks`, {
       method: 'POST',
       body: JSON.stringify({ title }),
     });
   },
 
-  toggleSubtask(subtaskId: string, isDone?: boolean) {
-    return request(`/api/subtasks/${subtaskId}`, {
+  toggleSubtask(subtaskId: string, isDone: boolean): Promise<Subtask> {
+    return request<Subtask>(`/api/subtasks/${subtaskId}`, {
       method: 'PATCH',
-      body: JSON.stringify(isDone !== undefined ? { isDone } : {}),
+      body: JSON.stringify({ isDone }),
     });
   },
 
