@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: focustask_backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DATABASE_URL=${DATABASE_URL:-postgresql://neondb_owner:npg_6YesJQpTMRk4@ep-holy-mode-acy9p31p-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require}
+    networks:
+      - focustask_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: focustask_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - focustask_network
+
+networks:
+  focustask_network:
+    driver: bridge

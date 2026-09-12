@@ -1,0 +1,415 @@
+{
+  "version": "1.0.0",
+  "project": "FocusTask Personal Kanban",
+  "authoritativeSources": [
+    "ORIGINAL_REQUEST.md",
+    "PROJECT.md",
+    "estrutura_projeto.md",
+    "proposta_sistema_tarefas.md"
+  ],
+  "testSuites": [
+    {
+      "tier": 1,
+      "tierName": "Feature Coverage",
+      "description": "Comprehensive individual feature verification covering Backend MCP, Backend REST, Frontend UI contracts, and Docker containerization.",
+      "domains": [
+        {
+          "domain": "BACKEND_MCP",
+          "features": [6, 7, 8, 9, 10, 11, 12],
+          "tests": [
+            {
+              "id": "T1-MCP-01",
+              "name": "MCP Server Tool Registry Verification",
+              "featureId": 6,
+              "description": "Verify MCP server exposes all 5 required tools: list_tasks, create_task, move_task, add_subtask, toggle_subtask with correct JSON schemas.",
+              "authoritativeSource": "PROJECT.md § Interface Contracts #1 & ORIGINAL_REQUEST R1",
+              "expectedTools": ["list_tasks", "create_task", "move_task", "add_subtask", "toggle_subtask"]
+            },
+            {
+              "id": "T1-MCP-02",
+              "name": "MCP list_tasks with Filters",
+              "featureId": 8,
+              "description": "Verify list_tasks returns task array including subtasks, respecting category and status filters.",
+              "authoritativeSource": "PROJECT.md Feature 8 & backend/src/index.ts",
+              "input": { "category": "PROJECT", "status": "TODO" },
+              "expectedOutput": { "format": "json_array", "subtasksIncluded": true }
+            },
+            {
+              "id": "T1-MCP-03",
+              "name": "MCP create_task Execution",
+              "featureId": 9,
+              "description": "Verify create_task creates a Task record with title, category, optional description, and returns confirmation message.",
+              "authoritativeSource": "PROJECT.md Feature 9 & Interface Contracts #1",
+              "input": { "title": "Test MCP Task", "category": "PROJECT", "description": "Created via MCP" },
+              "expectedPattern": "^Tarefa criada com sucesso: [0-9a-fA-F-]{36}$"
+            },
+            {
+              "id": "T1-MCP-04",
+              "name": "MCP move_task Execution",
+              "featureId": 10,
+              "description": "Verify move_task updates task status to TODO, IN_PROGRESS, or DONE and returns confirmation.",
+              "authoritativeSource": "PROJECT.md Feature 10 & Interface Contracts #1",
+              "input": { "status": "IN_PROGRESS" },
+              "expectedPattern": "^Tarefa movida para IN_PROGRESS$"
+            },
+            {
+              "id": "T1-MCP-05",
+              "name": "MCP add_subtask Execution",
+              "featureId": 11,
+              "description": "Verify add_subtask creates a Subtask record linked to taskId and returns confirmation.",
+              "authoritativeSource": "ORIGINAL_REQUEST R1 & PROJECT.md Feature 11",
+              "input": { "title": "Implement Prisma hook" },
+              "expectedPattern": "^Subtarefa criada com sucesso: [0-9a-fA-F-]{36}$"
+            },
+            {
+              "id": "T1-MCP-06",
+              "name": "MCP toggle_subtask Execution",
+              "featureId": 12,
+              "description": "Verify toggle_subtask toggles isDone state and returns confirmation.",
+              "authoritativeSource": "ORIGINAL_REQUEST R1 & PROJECT.md Feature 12",
+              "input": { "isDone": true },
+              "expectedPattern": "^Subtarefa [0-9a-fA-F-]{36} marcada como (concluída|pendente)$"
+            }
+          ]
+        },
+        {
+          "domain": "BACKEND_REST",
+          "features": [13, 14, 15, 16, 17, 18, 19],
+          "tests": [
+            {
+              "id": "T1-REST-01",
+              "name": "REST GET /api/tasks Schema and Filters",
+              "featureId": 13,
+              "description": "Verify GET /api/tasks returns 200 with task array containing nested subtasks and supports query params.",
+              "authoritativeSource": "PROJECT.md § Interface Contracts #2",
+              "method": "GET",
+              "path": "/api/tasks",
+              "expectedStatus": 200
+            },
+            {
+              "id": "T1-REST-02",
+              "name": "REST POST /api/tasks Creation",
+              "featureId": 14,
+              "description": "Verify POST /api/tasks creates task and returns 201 with created Task object.",
+              "authoritativeSource": "PROJECT.md § Interface Contracts #2",
+              "method": "POST",
+              "path": "/api/tasks",
+              "input": { "title": "REST Test Task", "category": "COLLEGE", "description": "Study notes" },
+              "expectedStatus": 201
+            },
+            {
+              "id": "T1-REST-03",
+              "name": "REST PATCH /api/tasks/:id Update",
+              "featureId": 15,
+              "description": "Verify PATCH /api/tasks/:id updates status, title, category, or description and returns 200.",
+              "authoritativeSource": "PROJECT.md § Interface Contracts #2",
+              "method": "PATCH",
+              "path": "/api/tasks/:id",
+              "input": { "status": "DONE" },
+              "expectedStatus": 200
+            },
+            {
+              "id": "T1-REST-04",
+              "name": "REST DELETE /api/tasks/:id Deletion",
+              "featureId": 16,
+              "description": "Verify DELETE /api/tasks/:id deletes task and returns 204 No Content.",
+              "authoritativeSource": "PROJECT.md § Interface Contracts #2",
+              "method": "DELETE",
+              "path": "/api/tasks/:id",
+              "expectedStatus": 204
+            },
+            {
+              "id": "T1-REST-05",
+              "name": "REST POST /api/tasks/:id/subtasks Subtask Creation",
+              "featureId": 17,
+              "description": "Verify POST /api/tasks/:id/subtasks creates child subtask and returns 201.",
+              "authoritativeSource": "PROJECT.md § Interface Contracts #2",
+              "method": "POST",
+              "path": "/api/tasks/:id/subtasks",
+              "input": { "title": "Review lecture slides" },
+              "expectedStatus": 201
+            },
+            {
+              "id": "T1-REST-06",
+              "name": "REST PATCH /api/subtasks/:id Subtask Toggle",
+              "featureId": 18,
+              "description": "Verify PATCH /api/subtasks/:id toggles isDone status and returns 200.",
+              "authoritativeSource": "PROJECT.md § Interface Contracts #2",
+              "method": "PATCH",
+              "path": "/api/subtasks/:id",
+              "input": { "isDone": true },
+              "expectedStatus": 200
+            },
+            {
+              "id": "T1-REST-07",
+              "name": "REST DELETE /api/subtasks/:id Subtask Deletion",
+              "featureId": 19,
+              "description": "Verify DELETE /api/subtasks/:id deletes subtask and returns 204.",
+              "authoritativeSource": "PROJECT.md § Interface Contracts #2",
+              "method": "DELETE",
+              "path": "/api/subtasks/:id",
+              "expectedStatus": 204
+            }
+          ]
+        },
+        {
+          "domain": "FRONTEND_UI_CONTRACTS",
+          "features": [20, 21, 22, 23, 24, 25],
+          "tests": [
+            {
+              "id": "T1-UI-01",
+              "name": "3-Column Kanban Board Structure",
+              "featureId": 20,
+              "description": "Verify KanbanBoard renders exactly 3 status columns: TODO ('A Fazer'), IN_PROGRESS ('Em Andamento'), DONE ('Concluído').",
+              "authoritativeSource": "ORIGINAL_REQUEST R2 & proposta_sistema_tarefas.md",
+              "expectedColumns": ["A Fazer", "Em Andamento", "Concluído"]
+            },
+            {
+              "id": "T1-UI-02",
+              "name": "Category Filter Tabs",
+              "featureId": 21,
+              "description": "Verify filter bar provides filters for: Todas, Projetos, Faculdade, Pessoais.",
+              "authoritativeSource": "proposta_sistema_tarefas.md & PROJECT.md Feature 21",
+              "expectedFilters": ["Todas", "Projetos", "Faculdade", "Pessoais"]
+            },
+            {
+              "id": "T1-UI-03",
+              "name": "Task Creation Modal Contract",
+              "featureId": 22,
+              "description": "Verify CreateTaskModal component has inputs for title, category selection (PROJECT, COLLEGE, PERSONAL), and optional description.",
+              "authoritativeSource": "ORIGINAL_REQUEST R2 & PROJECT.md Feature 22",
+              "expectedFields": ["title", "category", "description"]
+            },
+            {
+              "id": "T1-UI-04",
+              "name": "Task Card Status Move Controls",
+              "featureId": 23,
+              "description": "Verify TaskCard provides interactive buttons to move cards forward and backward across columns.",
+              "authoritativeSource": "ORIGINAL_REQUEST R2 & PROJECT.md Feature 23",
+              "expectedActions": ["move_forward", "move_backward", "delete_task"]
+            },
+            {
+              "id": "T1-UI-05",
+              "name": "Subtask Checklist and Progress Counter",
+              "featureId": 24,
+              "description": "Verify TaskCard renders subtasks with checkboxes, strikethrough styling for completed items, and progress counter (e.g., 2/3).",
+              "authoritativeSource": "ORIGINAL_REQUEST R2 & PROJECT.md Feature 24",
+              "expectedFeatures": ["checkbox", "strikethrough", "progress_ratio"]
+            },
+            {
+              "id": "T1-UI-06",
+              "name": "Inline Subtask Addition Input",
+              "featureId": 25,
+              "description": "Verify TaskCard renders input field allowing inline addition of new subtasks without opening full edit modal.",
+              "authoritativeSource": "ORIGINAL_REQUEST R2 & PROJECT.md Feature 25",
+              "expectedFeatures": ["inline_input", "submit_button_or_enter"]
+            }
+          ]
+        },
+        {
+          "domain": "DOCKER_CONFIGS",
+          "features": [26, 27, 28],
+          "tests": [
+            {
+              "id": "T1-DOC-01",
+              "name": "Backend Dockerfile Syntax & Directives",
+              "featureId": 26,
+              "description": "Verify backend/Dockerfile uses Node 20 Alpine, generates Prisma client, and exposes port 3000.",
+              "authoritativeSource": "ORIGINAL_REQUEST R3 & PROJECT.md Feature 26",
+              "expectedDirectives": ["FROM node:20-alpine", "prisma generate", "EXPOSE 3000"]
+            },
+            {
+              "id": "T1-DOC-02",
+              "name": "Frontend Multi-Stage Dockerfile",
+              "featureId": 27,
+              "description": "Verify frontend/Dockerfile implements multi-stage build (Node build stage -> Nginx alpine runtime).",
+              "authoritativeSource": "ORIGINAL_REQUEST R3 & PROJECT.md Feature 27",
+              "expectedDirectives": ["as build", "FROM nginx:alpine", "COPY --from=build"]
+            },
+            {
+              "id": "T1-DOC-03",
+              "name": "Docker Compose Service Composition",
+              "featureId": 28,
+              "description": "Verify docker-compose.yml defines both backend and frontend services, maps ports, and passes DATABASE_URL to backend.",
+              "authoritativeSource": "ORIGINAL_REQUEST R3 & PROJECT.md Feature 28",
+              "expectedServices": ["backend", "frontend"],
+              "expectedEnv": ["DATABASE_URL"]
+            },
+            {
+              "id": "T1-DOC-04",
+              "name": "Nginx Reverse Proxy Configuration",
+              "featureId": 27,
+              "description": "Verify frontend/nginx.conf proxies /api/ requests to backend:3000 and provides SPA routing fallback.",
+              "authoritativeSource": "PROJECT.md § Interface Contracts #3",
+              "expectedDirectives": ["proxy_pass http://backend:3000", "try_files $uri $uri/ /index.html"]
+            },
+            {
+              "id": "T1-DOC-05",
+              "name": "Vite Development Proxy Configuration",
+              "featureId": 20,
+              "description": "Verify frontend/vite.config.ts configures dev proxy routing /api to http://localhost:3000.",
+              "authoritativeSource": "PROJECT.md § Interface Contracts #3",
+              "expectedDirectives": ["proxy", "target: 'http://localhost:3000'"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tier": 2,
+      "tierName": "Boundary & Corner Cases",
+      "description": "Rigorous validation of boundary conditions, edge cases, negative tests, and data integrity constraints.",
+      "tests": [
+        {
+          "id": "T2-BND-01",
+          "name": "Empty and Whitespace-Only Task Titles",
+          "features": [9, 14],
+          "description": "Submitting empty string '' or whitespace '   ' as task title must be rejected with 400 Bad Request or validation error.",
+          "input": { "title": "   ", "category": "PROJECT" },
+          "expectedError": true,
+          "expectedStatus": 400
+        },
+        {
+          "id": "T2-BND-02",
+          "name": "Extremely Long Title and Description (Resource Stress)",
+          "features": [9, 14],
+          "description": "Verify system handles 1,000+ character titles and descriptions without database failure or unexpected truncation.",
+          "input": { "title": "A".repeat(500), "description": "B".repeat(2000), "category": "PERSONAL" },
+          "expectedStatus": 201
+        },
+        {
+          "id": "T2-BND-03",
+          "name": "Special Characters, Emojis, XSS & SQL Injection Escaping",
+          "features": [9, 14, 17],
+          "description": "Verify system safely stores and returns strings containing quotes, HTML tags, SQL injection payloads, and multibyte UTF-8 emojis.",
+          "input": {
+            "title": "Projeto 'FocusTask' <script>alert(1)</script> 🚀 & \"; DROP TABLE Tasks; --",
+            "description": "Árvore de Natal com maçã & pão 🇧🇷 \n \t \"quotes\" and 'apostrophes'",
+            "category": "PROJECT"
+          },
+          "expectedFidelityCheck": true
+        },
+        {
+          "id": "T2-BND-04",
+          "name": "Non-Existent UUID Handling",
+          "features": [10, 15, 16, 17, 18, 19],
+          "description": "Accessing, moving, updating, or adding subtask to non-existent UUID '00000000-0000-0000-0000-000000000000' must return 404 or specific error.",
+          "input": { "id": "00000000-0000-0000-0000-000000000000" },
+          "expectedStatus": 404
+        },
+        {
+          "id": "T2-BND-05",
+          "name": "Invalid Enum Values for Category and Status",
+          "features": [4, 5, 9, 14, 15],
+          "description": "Submitting invalid category 'INVALID_CAT' or status 'PENDING' must be rejected with 400 Bad Request.",
+          "input": { "title": "Invalid Enum Test", "category": "INVALID_CAT" },
+          "expectedStatus": 400
+        },
+        {
+          "id": "T2-BND-06",
+          "name": "Cascade Deletion Integrity",
+          "features": [3, 16, 19],
+          "description": "Deleting a Task record must automatically cascade-delete all child subtasks in the database.",
+          "workflow": [
+            "Create task with title 'Cascade Parent'",
+            "Add 3 subtasks to task",
+            "Verify all 3 subtasks exist in database",
+            "Delete parent task",
+            "Verify parent task is gone (404)",
+            "Verify all 3 subtasks are completely removed (not orphaned)"
+          ]
+        },
+        {
+          "id": "T2-BND-07",
+          "name": "Subtask Toggle State Inversion vs Explicit Boolean",
+          "features": [12, 18],
+          "description": "Verify toggle endpoint inverts state when isDone is omitted, and sets explicit boolean when provided.",
+          "workflow": [
+            "Create subtask (defaults to isDone=false)",
+            "Call toggle with no body -> isDone becomes true",
+            "Call toggle with no body -> isDone becomes false",
+            "Call toggle with isDone: true -> isDone remains true",
+            "Call toggle with isDone: true -> isDone remains true"
+          ]
+        },
+        {
+          "id": "T2-BND-08",
+          "name": "Subtask Creation with Missing Title or Missing Parent",
+          "features": [11, 17],
+          "description": "Adding a subtask with empty title or to a non-existent parent must be rejected.",
+          "input": { "title": "" },
+          "expectedStatus": 400
+        }
+      ]
+    },
+    {
+      "tier": 3,
+      "tierName": "Cross-Feature Combinations",
+      "description": "Multi-step workflows combining multiple features across MCP and REST interfaces.",
+      "tests": [
+        {
+          "id": "T3-CMB-01",
+          "name": "Full Task & Subtask Lifecycle (Create -> Subtasks -> Progress -> Complete -> Delete)",
+          "features": [1, 2, 3, 14, 15, 16, 17, 18],
+          "description": "Execute complete end-to-end task lifecycle: Create TODO task, add 3 subtasks, toggle 2 to done, move task to IN_PROGRESS, complete final subtask, move task to DONE, verify state consistency, delete task, verify cascade cleanup.",
+          "steps": 7
+        },
+        {
+          "id": "T3-CMB-02",
+          "name": "Dual Interface Synchronization (MCP ↔ REST Interoperability)",
+          "features": [8, 9, 10, 11, 12, 13, 14, 15, 16],
+          "description": "Create task via MCP -> Read via REST API -> Add subtask via REST API -> Toggle subtask via MCP -> Move task status via REST -> Query filtered task via MCP -> Delete via REST -> Confirm deleted on both.",
+          "steps": 8
+        },
+        {
+          "id": "T3-CMB-03",
+          "name": "Category and Status Multi-Filter Matrix",
+          "features": [4, 5, 8, 13, 21],
+          "description": "Create tasks covering all 3 categories (PROJECT, COLLEGE, PERSONAL) and all 3 statuses (TODO, IN_PROGRESS, DONE). Test all 9 combinations of category and status filters via REST and MCP, verifying exact subset isolation.",
+          "matrixCombinations": 9
+        },
+        {
+          "id": "T3-CMB-04",
+          "name": "Independent Subtask Scoping Across Sibling Tasks",
+          "features": [2, 17, 18, 19],
+          "description": "Create Task A and Task B with identically named subtasks. Modifying or deleting subtasks on Task A must have zero side effects on Task B.",
+          "steps": 5
+        }
+      ]
+    },
+    {
+      "tier": 4,
+      "tierName": "Real-World Application Scenarios",
+      "description": "End-to-end realistic usage personas reflecting user goals and workflows.",
+      "tests": [
+        {
+          "id": "T4-SCN-01",
+          "name": "Software Engineering Sprint Workflow",
+          "persona": "Full-stack Software Engineer",
+          "scenario": "Agile Sprint Delivery",
+          "category": "PROJECT",
+          "story": "Developer creates sprint epic 'Deploy FocusTask MVP to Production'. Breaks down work into 4 subtasks (Docker backend, Docker frontend, Compose setup, Remote DB migration). Moves card to 'Em Andamento', completes subtasks incrementally, adds emergent bug fix subtask 'Fix Alpine openssl package', marks all done, and completes card to 'Concluído'.",
+          "expectedResult": "Task progresses smoothly through Kanban stages with real-time subtask counter reflecting 5/5 completed."
+        },
+        {
+          "id": "T4-SCN-02",
+          "name": "University Semester Exam Preparation",
+          "persona": "Computer Science Undergraduate",
+          "scenario": "Final Exam Study Plan",
+          "category": "COLLEGE",
+          "story": "Student creates study card 'Sistemas Distribuídos - Prova Final'. Adds checklist for topics: 'Revisar Raft Consensus', 'Resolver lista 3', 'Assistir gravação sobre RPC'. Filters Kanban board by 'Faculdade' to eliminate project distractions. Completes study units during exam week, moves card to 'Concluído' after exam day.",
+          "expectedResult": "Category filtering accurately isolates college tasks, progress counter tracks study items."
+        },
+        {
+          "id": "T4-SCN-03",
+          "name": "Personal Life and Weekend Errands",
+          "persona": "Busy Individual",
+          "scenario": "Saturday Home Maintenance & Shopping",
+          "category": "PERSONAL",
+          "story": "User creates weekend checklist 'Tarefas de Sábado'. Adds checklist items: 'Comprar café em grãos', 'Trocar lâmpada da sala', 'Pagar fatura do cartão'. Toggles tasks off one by one from mobile browser view, deletes item that was cancelled, moves card to DONE when all finished.",
+          "expectedResult": "Immediate checklist feedback, subtask deletion without affecting parent card, clean board."
+        }
+      ]
+    }
+  ]
+}
