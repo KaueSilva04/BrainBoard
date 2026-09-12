@@ -1,0 +1,294 @@
+{
+  "timestamp": "2026-09-12T17:23:08.011Z",
+  "targetWorkspace": "C:/Users/Kaue/Desktop/BrainBoard",
+  "isLive": false,
+  "total": 37,
+  "passed": 37,
+  "failed": 0,
+  "skipped": 0,
+  "passRate": "100.0%",
+  "results": [
+    {
+      "id": "T1-MCP-01",
+      "tier": 1,
+      "name": "MCP Server Tool Registrations Contract",
+      "domain": "BACKEND_MCP",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-MCP-02",
+      "tier": 1,
+      "name": "MCP SSE Transport Endpoints Contract",
+      "domain": "BACKEND_MCP",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T1-MCP-03",
+      "tier": 1,
+      "name": "MCP add_subtask Handler Implementation",
+      "domain": "BACKEND_MCP",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T1-MCP-04",
+      "tier": 1,
+      "name": "MCP toggle_subtask Handler Implementation",
+      "domain": "BACKEND_MCP",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-MCP-05",
+      "tier": 1,
+      "name": "MCP list_tasks Query Filtering Logic",
+      "domain": "BACKEND_MCP",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T1-REST-01",
+      "tier": 1,
+      "name": "REST GET /api/tasks Endpoint",
+      "domain": "BACKEND_REST",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T1-REST-02",
+      "tier": 1,
+      "name": "REST POST /api/tasks Task Creation",
+      "domain": "BACKEND_REST",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T1-REST-03",
+      "tier": 1,
+      "name": "REST PATCH /api/tasks/:id Status & Details Update",
+      "domain": "BACKEND_REST",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-REST-04",
+      "tier": 1,
+      "name": "REST DELETE /api/tasks/:id Deletion",
+      "domain": "BACKEND_REST",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T1-REST-05",
+      "tier": 1,
+      "name": "REST POST /api/tasks/:id/subtasks Subtask Creation",
+      "domain": "BACKEND_REST",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T1-REST-06",
+      "tier": 1,
+      "name": "REST PATCH /api/subtasks/:id Subtask Toggle",
+      "domain": "BACKEND_REST",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T1-REST-07",
+      "tier": 1,
+      "name": "REST DELETE /api/subtasks/:id Subtask Deletion",
+      "domain": "BACKEND_REST",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T1-UI-01",
+      "tier": 1,
+      "name": "Frontend Kanban 3-Column Board Structure",
+      "domain": "FRONTEND_UI",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-UI-02",
+      "tier": 1,
+      "name": "Frontend Category Filter Bar Implementation",
+      "domain": "FRONTEND_UI",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T1-UI-03",
+      "tier": 1,
+      "name": "Frontend Task Creation Modal Validation",
+      "domain": "FRONTEND_UI",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T1-UI-04",
+      "tier": 1,
+      "name": "Frontend Task Card Subtask Checklist & Action Controls",
+      "domain": "FRONTEND_UI",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-UI-05",
+      "tier": 1,
+      "name": "Frontend Inline Subtask Addition Input",
+      "domain": "FRONTEND_UI",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T1-UI-06",
+      "tier": 1,
+      "name": "Frontend API Client Service Contract",
+      "domain": "FRONTEND_UI",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T1-DOC-01",
+      "tier": 1,
+      "name": "Backend Dockerfile Directives and Prisma Client",
+      "domain": "DOCKER_CONFIG",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-DOC-02",
+      "tier": 1,
+      "name": "Frontend Dockerfile Multi-Stage Build & Nginx Runtime",
+      "domain": "DOCKER_CONFIG",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T1-DOC-03",
+      "tier": 1,
+      "name": "Root docker-compose.yml Multi-Service Orchestration",
+      "domain": "DOCKER_CONFIG",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-DOC-04",
+      "tier": 1,
+      "name": "Nginx Reverse Proxy Configuration & SPA Fallback",
+      "domain": "DOCKER_CONFIG",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T1-DOC-05",
+      "tier": 1,
+      "name": "Vite Development Proxy Configuration",
+      "domain": "DOCKER_CONFIG",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T2-BND-01",
+      "tier": 2,
+      "name": "Empty and Whitespace-Only Task Titles Rejected",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T2-BND-02",
+      "tier": 2,
+      "name": "Resource Stress: 1,000+ Character Title and Description",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-BND-03",
+      "tier": 2,
+      "name": "Special Characters, XSS, & SQL Injection Escaping Fidelity",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T2-BND-04",
+      "tier": 2,
+      "name": "Non-Existent UUID Handling Returns 404",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-BND-05",
+      "tier": 2,
+      "name": "Invalid Category and Status Enum Values Rejected",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T2-BND-06",
+      "tier": 2,
+      "name": "Cascade Deletion Integrity Contract (onDelete: Cascade)",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T2-BND-07",
+      "tier": 2,
+      "name": "Subtask Toggle State Inversion Contract",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T3-CMB-01",
+      "tier": 3,
+      "name": "Full Lifecycle: Create Task -> Add Subtasks -> Progress -> Complete -> Delete",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T3-CMB-02",
+      "tier": 3,
+      "name": "Dual Interface Synchronization (MCP ↔ REST Interoperability)",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T3-CMB-03",
+      "tier": 3,
+      "name": "Category and Status Multi-Filter Matrix Contract",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T3-CMB-04",
+      "tier": 3,
+      "name": "Subtask Isolation Across Sibling Tasks",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T4-SCN-01",
+      "tier": 4,
+      "name": "Scenario 1: Agile Sprint Delivery Workflow (PROJECT)",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T4-SCN-02",
+      "tier": 4,
+      "name": "Scenario 2: Academic Semester Exam Preparation (COLLEGE)",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T4-SCN-03",
+      "tier": 4,
+      "name": "Scenario 3: Personal Weekend Errands (PERSONAL)",
+      "status": "PASSED",
+      "durationMs": 0
+    }
+  ]
+}
