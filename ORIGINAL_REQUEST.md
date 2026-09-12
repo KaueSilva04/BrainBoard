@@ -203,4 +203,58 @@ Pontos obrigatórios de commit (execute `git add -A` e `git commit -m "..."` ap�
 
 Use `git add -A` antes de cada commit para capturar todas as mudanças do ponto.
 
+## Follow-up — 2026-09-12T17:46:10Z
 
+Migrar a arquitetura do backend do FocusTask (antigo Kanban de Tarefas) para o **BrainBoard V2**, um sistema focado em Projetos, Etapas (Milestones) e Diários de Bordo (Update Logs), garantindo a integração contínua do MCP e a reescrita da suíte de testes E2E.
+
+Working directory: C:/Users/Kaue/Desktop/BrainBoard
+Integrity mode: development
+
+## Requirements
+
+### R1. Refatoração do Schema do Banco de Dados (Prisma)
+Substituir o modelo antigo por uma nova hierarquia de Projetos. Atualize o `backend/prisma/schema.prisma` para incluir:
+- **Project**: `id`, `title`, `description`, `businessLogic` (Text), `status` (Enum: PLANNING, ACTIVE, COMPLETED), timestamps.
+- **UpdateLog**: `id`, `title`, `content` (Text), `author`, `projectId` (relação cascade).
+- **Stage (Etapas)**: `id`, `title`, `order`, `status` (Enum), `projectId` (relação cascade).
+- **Member**: `id`, `name`, `role`, `projectId` (relação cascade).
+- **Task & Subtask**: Atualize a `Task` para pertencer a um `Stage` (remover o enum antigo `Category`). A relação deve ser `Project -> Stage -> Task -> Subtask`.
+
+Gere a migration e atualize o Prisma Client (`npx prisma migrate dev --name init_v2` ou `npx prisma db push`).
+
+### R2. Atualização dos Serviços e REST API
+Atualize o código em `backend/src/` (incluindo `index.ts` e serviços) para suportar a nova estrutura:
+- Adicione rotas REST completas para criar/listar Projetos, Stages e UpdateLogs.
+- Adapte as rotas de Tasks para o novo formato (pertencendo a um Stage).
+
+### R3. Superpoderes de IA (Novas MCP Tools)
+O servidor MCP em `backend/src/index.ts` deve registrar novas ferramentas vitais para a IA:
+- `read_project_context`: Recebe `projectId` e retorna a Lógica de Negócio, Etapas e últimos logs de atualização.
+- `update_business_logic`: Atualiza o campo `businessLogic` de um projeto.
+- `log_project_update`: Cria um `UpdateLog` com `title`, `content` (Markdown complexo) e `author`.
+- Adapte as ferramentas antigas de task para exigir `stageId`.
+
+### R4. Reescrita Completa dos Testes E2E
+A suíte atual de testes (`tests/e2e_test_runner.ts`) falhará catastroficamente pois está amarrada ao modelo antigo. Você deve **reescrever completamente o E2E Test Runner** e os `test_cases.json` (se houver) para validar a nova arquitetura (ex: Criar projeto -> Adicionar Stage -> Escrever Business Logic -> Adicionar Log de Atualização).
+
+## Acceptance Criteria
+
+### Testes e Validação
+- [ ] O comando `npx prisma db push` (ou migrate) deve rodar sem erros.
+- [ ] O backend compila sem erros (`npm run build` na pasta backend).
+- [ ] O novo `tests/e2e_test_runner.ts` passa com 100% de sucesso, validando a criação de projetos, leitura de contexto via MCP e adição de update logs via MCP.
+- [ ] Os logs do MCP expõem corretamente as ferramentas `read_project_context`, `update_business_logic` e `log_project_update`.
+
+## Follow-up — 2026-09-12T17:50:32Z
+
+**URGENTE: Nova Regra de Negócio (Requisito Adicional)**
+
+O usuário solicitou uma expansão no modelo de dados antes da criação das tabelas. Atualize o planejamento do `schema.prisma` com o seguinte:
+
+1. **Configurações do Projeto**: O modelo `Project` deve ter campos para configurações técnicas, como:
+   - `githubRepo` (String opcional)
+   - `settings` (JSON - para armazenar configurações dinâmicas que o agente ou usuário definam no futuro, ex: URLs de deploy, stack, chaves, etc).
+2. **Membros Mais Completos**: O modelo `Member` deve incluir um campo `email` (String opcional) além do nome e cargo.
+3. **MCP Tools**: Certifique-se de que a ferramenta `update_business_logic` (ou uma nova `update_project_settings`) permita à IA preencher o repositório Github e configurações JSON.
+
+Incorpore isso na Fase 1 (Modelagem) antes de executar a migração.

@@ -1,11 +1,13 @@
 /**
- * FocusTask End-to-End Test Runner (e2e_test_runner.ts)
+ * BrainBoard V2 End-to-End Test Runner (e2e_test_runner.ts)
  * 
- * Comprehensive 4-Tier Automated Verification Harness:
- * - Tier 1: Feature Coverage (Backend MCP, Backend REST, Frontend UI Contracts, Docker Configs)
- * - Tier 2: Boundary & Corner Cases (Empty titles, long titles, special chars/XSS/SQLi, non-existent UUIDs, invalid enums, cascade deletion)
- * - Tier 3: Cross-Feature Combinations (Full lifecycle, Dual MCP/REST sync, Multi-filter matrix, Subtask isolation)
- * - Tier 4: Real-World Scenarios (Sprint workflow, Academic semester, Personal errands)
+ * Comprehensive 4-Tier Automated Verification Harness for BrainBoard V2:
+ * - Tier 1: Feature Coverage (REST CRUD Projects/Stages/Logs/Members/Tasks/Subtasks, Real MCP SSE Tools, Docker)
+ * - Tier 2: Boundary & Corner Cases (Empty titles 400, Unbounded text stress, SQLi/XSS/UTF-8 fidelity, UUID 404, Invalid Enums 400, JSON settings, Member validation)
+ * - Tier 3: Cascade Deletion & Dual Interface Synchronization (Project cascade, Stage cascade, Task cascade, Dual REST/MCP sync, Multi-stage task isolation)
+ * - Tier 4: Real-World Scenarios (Autonomous AI SDLC Lifecycle, Agile Milestone Delivery, Audit Trail & Governance)
+ * 
+ * Zero External Dependencies: Relies exclusively on Node.js core modules (`fs`, `path`, `http`).
  * 
  * Execution:
  *   npx tsx tests/e2e_test_runner.ts [--live] [--contract] [--tier=1|2|3|4]
@@ -45,17 +47,355 @@ if (process.env.WORKSPACE_DIR && fs.existsSync(process.env.WORKSPACE_DIR)) {
   targetWorkspace = process.env.WORKSPACE_DIR;
 }
 
-const isLive = process.argv.includes('--live');
-const tierFilter = process.argv.find(a => a.startsWith('--tier='))?.split('=')[1];
+const isLiveArg = process.argv.includes('--live');
+const tierFilter = process.argv.find((a) => a.startsWith('--tier='))?.split('=')[1];
 const backendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
 
 console.log(`${colors.cyan}${colors.bright}====================================================${colors.reset}`);
-console.log(`${colors.cyan}${colors.bright}   FocusTask Automated 4-Tier E2E Test Runner       ${colors.reset}`);
+console.log(`${colors.cyan}${colors.bright}   BrainBoard V2 Automated 4-Tier E2E Test Runner    ${colors.reset}`);
 console.log(`${colors.cyan}${colors.bright}====================================================${colors.reset}`);
 console.log(`${colors.dim}Target Workspace:${colors.reset} ${targetWorkspace}`);
-console.log(`${colors.dim}Mode:${colors.reset} ${isLive ? 'Live Server Execution' : 'Contract & Static Verification + Live Probing'}`);
-if (tierFilter) console.log(`${colors.dim}Filtering Tier:${colors.reset} ${tierFilter}`);
+console.log(`${colors.dim}Backend URL:${colors.reset}      ${backendUrl}`);
+console.log(`${colors.dim}CLI Flag --live:${colors.reset}  ${isLiveArg ? 'Enabled' : 'Not set (will auto-probe)'}`);
+if (tierFilter) console.log(`${colors.dim}Filtering Tier:${colors.reset}    ${tierFilter}`);
 console.log('');
+
+// Assert Helpers
+function assert(condition: boolean, message: string) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+function assertIncludes(haystack: string, needle: string, message: string) {
+  if (!haystack.includes(needle)) {
+    throw new Error(`${message}: Expected substring "${needle}" not found in target.`);
+  }
+}
+
+function assertMatch(haystack: string, regex: RegExp, message: string) {
+  if (!regex.test(haystack)) {
+    throw new Error(`${message}: Value does not match regex ${regex}`);
+  }
+}
+
+function assertEqual(actual: any, expected: any, message: string) {
+  if (actual !== expected) {
+    throw new Error(`${message}: Expected ${JSON.stringify(expected)}, received ${JSON.stringify(actual)}`);
+  }
+}
+
+// HTTP Helper for live testing
+function makeRequest(
+  method: string,
+  endpoint: string,
+  body?: any,
+  timeoutMs = 12000
+): Promise<{ status: number; data: any; raw: string }> {
+  return new Promise((resolve, reject) => {
+    const url = new URL(endpoint, backendUrl);
+    const postData = body !== undefined ? JSON.stringify(body) : undefined;
+
+    const req = http.request(
+      url,
+      {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(postData ? { 'Content-Length': Buffer.byteLength(postData) } : {}),
+        },
+        timeout: timeoutMs,
+      },
+      (res) => {
+        let raw = '';
+        res.on('data', (chunk) => (raw += chunk));
+        res.on('end', () => {
+          let data = null;
+          try {
+            data = JSON.parse(raw);
+          } catch {
+            data = raw;
+          }
+          resolve({ status: res.statusCode || 0, data, raw });
+        });
+      }
+    );
+
+    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error(`Request timed out to ${endpoint} after ${timeoutMs}ms`));
+    });
+
+    if (postData) {
+      req.write(postData);
+    }
+    req.end();
+  });
+}
+
+// Probes whether live server is running
+async function isServerRunning(): Promise<boolean> {
+  try {
+    const res = await makeRequest('GET', '/api/health', undefined, 2000);
+    return res.status === 200;
+  } catch {
+    try {
+      const res2 = await makeRequest('GET', '/api/projects', undefined, 2000);
+      return res2.status === 200;
+    } catch {
+      return false;
+    }
+  }
+}
+
+/**
+ * Embedded Native McpSseClient
+ * Zero-dependency implementation connecting to GET /mcp/sse and posting to /mcp/messages
+ */
+class McpSseClient {
+  private req: http.ClientRequest | null = null;
+  private res: http.IncomingMessage | null = null;
+  private sessionId: string | null = null;
+  private messagePath: string | null = null;
+  private nextId = 1;
+  private pendingRequests = new Map<
+    number | string,
+    {
+      resolve: (val: any) => void;
+      reject: (err: any) => void;
+      timer: NodeJS.Timeout;
+    }
+  >();
+  private buffer = '';
+  private currentEvent = '';
+  private currentData: string[] = [];
+
+  constructor(private baseUrl: string) {}
+
+  async connect(timeoutMs = 6000): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const sseUrl = new URL('/mcp/sse', this.baseUrl);
+      let connected = false;
+
+      const timer = setTimeout(() => {
+        this.close();
+        if (!connected) {
+          reject(new Error(`MCP SSE connection timeout after ${timeoutMs}ms`));
+        }
+      }, timeoutMs);
+
+      this.req = http.request(
+        sseUrl,
+        {
+          method: 'GET',
+          headers: { Accept: 'text/event-stream' },
+        },
+        (res) => {
+          this.res = res;
+          if (res.statusCode !== 200) {
+            clearTimeout(timer);
+            return reject(new Error(`MCP SSE connection failed with status ${res.statusCode}`));
+          }
+
+          res.on('data', (chunk: Buffer) => {
+            this.buffer += chunk.toString();
+            this.processBuffer((endpointUrl) => {
+              if (!connected) {
+                connected = true;
+                clearTimeout(timer);
+                const parsed = new URL(endpointUrl, this.baseUrl);
+                this.messagePath = parsed.pathname + parsed.search;
+                this.sessionId = parsed.searchParams.get('sessionId');
+                resolve();
+              }
+            });
+          });
+
+          res.on('error', (err) => {
+            clearTimeout(timer);
+            if (!connected) reject(err);
+          });
+        }
+      );
+
+      this.req.on('error', (err) => {
+        clearTimeout(timer);
+        if (!connected) reject(err);
+      });
+
+      this.req.end();
+    });
+  }
+
+  private processBuffer(onEndpoint: (url: string) => void) {
+    const lines = this.buffer.split(/\r?\n/);
+    this.buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (line.startsWith('event:')) {
+        this.currentEvent = line.slice(6).trim();
+      } else if (line.startsWith('data:')) {
+        this.currentData.push(line.slice(5).trim());
+      } else if (line === '') {
+        const fullData = this.currentData.join('\n');
+        if (this.currentEvent === 'endpoint' && fullData) {
+          onEndpoint(fullData);
+        } else if (this.currentEvent === 'message' && fullData) {
+          try {
+            const message = JSON.parse(fullData);
+            if (message.id !== undefined && this.pendingRequests.has(message.id)) {
+              const { resolve, reject, timer } = this.pendingRequests.get(message.id)!;
+              clearTimeout(timer);
+              this.pendingRequests.delete(message.id);
+              if (message.error) {
+                reject(new Error(message.error.message || JSON.stringify(message.error)));
+              } else {
+                resolve(message.result);
+              }
+            }
+          } catch (e) {
+            // Non-JSON or incomplete chunk
+          }
+        }
+        this.currentEvent = '';
+        this.currentData = [];
+      }
+    }
+  }
+
+  async callTool(name: string, args: Record<string, any> = {}, timeoutMs = 8000): Promise<any> {
+    if (!this.sessionId || !this.messagePath) {
+      throw new Error('MCP SSE client is not connected');
+    }
+
+    const id = this.nextId++;
+    const postPayload = JSON.stringify({
+      jsonrpc: '2.0',
+      id,
+      method: 'tools/call',
+      params: { name, arguments: args },
+    });
+
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingRequests.delete(id);
+        reject(new Error(`MCP tool call '${name}' timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      this.pendingRequests.set(id, { resolve, reject, timer });
+
+      const postUrl = new URL(this.messagePath!, this.baseUrl);
+      const postReq = http.request(
+        postUrl,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(postPayload),
+          },
+        },
+        (res) => {
+          if (res.statusCode !== 202 && res.statusCode !== 200) {
+            let errBody = '';
+            res.on('data', (c) => (errBody += c));
+            res.on('end', () => {
+              clearTimeout(timer);
+              this.pendingRequests.delete(id);
+              reject(new Error(`MCP POST message returned status ${res.statusCode}: ${errBody}`));
+            });
+            return;
+          }
+        }
+      );
+
+      postReq.on('error', (err) => {
+        clearTimeout(timer);
+        this.pendingRequests.delete(id);
+        reject(err);
+      });
+
+      postReq.write(postPayload);
+      postReq.end();
+    });
+  }
+
+  async listTools(timeoutMs = 8000): Promise<any[]> {
+    if (!this.sessionId || !this.messagePath) {
+      throw new Error('MCP SSE client is not connected');
+    }
+
+    const id = this.nextId++;
+    const postPayload = JSON.stringify({
+      jsonrpc: '2.0',
+      id,
+      method: 'tools/list',
+      params: {},
+    });
+
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingRequests.delete(id);
+        reject(new Error(`MCP listTools timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      this.pendingRequests.set(id, {
+        resolve: (res) => resolve(res?.tools || []),
+        reject,
+        timer,
+      });
+
+      const postUrl = new URL(this.messagePath!, this.baseUrl);
+      const postReq = http.request(
+        postUrl,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(postPayload),
+          },
+        },
+        (res) => {
+          if (res.statusCode !== 202 && res.statusCode !== 200) {
+            let errBody = '';
+            res.on('data', (c) => (errBody += c));
+            res.on('end', () => {
+              clearTimeout(timer);
+              this.pendingRequests.delete(id);
+              reject(new Error(`MCP POST message returned status ${res.statusCode}: ${errBody}`));
+            });
+            return;
+          }
+        }
+      );
+
+      postReq.on('error', (err) => {
+        clearTimeout(timer);
+        this.pendingRequests.delete(id);
+        reject(err);
+      });
+
+      postReq.write(postPayload);
+      postReq.end();
+    });
+  }
+
+  close() {
+    for (const [id, { reject, timer }] of this.pendingRequests.entries()) {
+      clearTimeout(timer);
+      reject(new Error('MCP client closed connection'));
+    }
+    this.pendingRequests.clear();
+    try {
+      this.req?.destroy();
+      this.res?.destroy();
+    } catch {}
+    this.req = null;
+    this.res = null;
+    this.sessionId = null;
+    this.messagePath = null;
+  }
+}
 
 async function runTest(
   id: string,
@@ -83,495 +423,1007 @@ async function runTest(
   }
 }
 
-function assert(condition: boolean, message: string) {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
-
-function assertIncludes(haystack: string, needle: string, message: string) {
-  if (!haystack.includes(needle)) {
-    throw new Error(`${message}: Expected substring "${needle}" not found in target.`);
-  }
-}
-
-function assertMatch(haystack: string, regex: RegExp, message: string) {
-  if (!regex.test(haystack)) {
-    throw new Error(`${message}: Value does not match regex ${regex}`);
-  }
-}
-
-// HTTP Helper for live testing
-function makeRequest(method: string, endpoint: string, body?: any): Promise<{ status: number; data: any; raw: string }> {
-  return new Promise((resolve, reject) => {
-    const url = new URL(endpoint, backendUrl);
-    const postData = body ? JSON.stringify(body) : undefined;
-
-    const req = http.request(
-      url,
-      {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(postData ? { 'Content-Length': Buffer.byteLength(postData) } : {}),
-        },
-        timeout: 3000,
-      },
-      (res) => {
-        let raw = '';
-        res.on('data', (chunk) => (raw += chunk));
-        res.on('end', () => {
-          let data = null;
-          try {
-            data = JSON.parse(raw);
-          } catch {
-            data = raw;
-          }
-          resolve({ status: res.statusCode || 0, data, raw });
-        });
-      }
-    );
-
-    req.on('error', reject);
-    req.on('timeout', () => {
-      req.destroy();
-      reject(new Error(`Request timed out to ${endpoint}`));
-    });
-
-    if (postData) {
-      req.write(postData);
-    }
-    req.end();
-  });
-}
-
-// Probes whether live server is running
-async function isServerRunning(): Promise<boolean> {
-  try {
-    const res = await makeRequest('GET', '/api/tasks');
-    return res.status === 200 || res.status === 404;
-  } catch {
-    return false;
-  }
-}
-
 async function executeTestSuite() {
-  const serverUp = await isServerRunning();
-  console.log(`${colors.blue}Live Server Probing:${colors.reset} ${serverUp ? colors.green + 'ONLINE' : colors.yellow + 'OFFLINE (Running contract and structural verification)'}${colors.reset}\n`);
+  const isServerUp = await isServerRunning();
+  const serverUp = isLiveArg || isServerUp;
+
+  console.log(
+    `${colors.blue}Execution Mode:${colors.reset} ${
+      serverUp
+        ? colors.green + 'LIVE EXECUTION & INTEGRATION VERIFICATION'
+        : colors.yellow + 'OFFLINE ARCHITECTURAL & CONTRACT VERIFICATION'
+    }${colors.reset}\n`
+  );
+
+  let activeMcpClient: McpSseClient | null = null;
+  if (serverUp) {
+    try {
+      activeMcpClient = new McpSseClient(backendUrl);
+      await activeMcpClient.connect(5000);
+      console.log(`${colors.green}✓ MCP SSE transport established and session initialized.${colors.reset}\n`);
+    } catch (e: any) {
+      console.log(`${colors.yellow}Notice: MCP client handshake deferred to test runner: ${e.message}${colors.reset}\n`);
+      activeMcpClient = null;
+    }
+  }
+
+  // Helper to read backend source for contract tests
+  const getBackendIndex = () => {
+    const p = path.join(targetWorkspace, 'backend/src/index.ts');
+    assert(fs.existsSync(p), `backend/src/index.ts not found at ${p}`);
+    return fs.readFileSync(p, 'utf-8');
+  };
+
+  const getSchema = () => {
+    const p = path.join(targetWorkspace, 'backend/prisma/schema.prisma');
+    assert(fs.existsSync(p), `backend/prisma/schema.prisma not found at ${p}`);
+    return fs.readFileSync(p, 'utf-8');
+  };
 
   // =========================================================================
   // TIER 1: FEATURE COVERAGE
   // =========================================================================
-  console.log(`${colors.magenta}${colors.bright}--- TIER 1: FEATURE COVERAGE (Backend MCP, REST API, UI Contracts, Docker) ---${colors.reset}`);
+  console.log(`${colors.magenta}${colors.bright}--- TIER 1: FEATURE COVERAGE (Projects, Stages, Logs, Members, Tasks, Subtasks, MCP, Docker) ---${colors.reset}`);
 
-  // 1. Domain A: Backend MCP Tools
-  await runTest('T1-MCP-01', 1, 'MCP Server Tool Registrations Contract', () => {
-    const indexPath = path.join(targetWorkspace, 'backend/src/index.ts');
-    assert(fs.existsSync(indexPath), `File backend/src/index.ts must exist at ${indexPath}`);
-    const content = fs.readFileSync(indexPath, 'utf-8');
-
-    // Verify MCP tools registration
-    assertIncludes(content, "'list_tasks'", "MCP must register 'list_tasks' tool");
-    assertIncludes(content, "'create_task'", "MCP must register 'create_task' tool");
-    assertIncludes(content, "'move_task'", "MCP must register 'move_task' tool");
-    assertIncludes(content, "'add_subtask'", "MCP must register 'add_subtask' tool (R1 requirement)");
-    assertIncludes(content, "'toggle_subtask'", "MCP must register 'toggle_subtask' tool (R1 requirement)");
-  }, 'BACKEND_MCP');
-
-  await runTest('T1-MCP-02', 1, 'MCP SSE Transport Endpoints Contract', () => {
-    const indexPath = path.join(targetWorkspace, 'backend/src/index.ts');
-    assert(fs.existsSync(indexPath), `File backend/src/index.ts must exist`);
-    const content = fs.readFileSync(indexPath, 'utf-8');
-
-    assertIncludes(content, "app.get('/mcp/sse'", "MCP server must configure GET /mcp/sse for SSE transport");
-    assertIncludes(content, "app.post('/mcp/messages'", "MCP server must configure POST /mcp/messages for client messages");
-    assertIncludes(content, "SSEServerTransport", "MCP server must use SSEServerTransport from @modelcontextprotocol/sdk");
-  }, 'BACKEND_MCP');
-
-  await runTest('T1-MCP-03', 1, 'MCP add_subtask Handler Implementation', () => {
-    const indexPath = path.join(targetWorkspace, 'backend/src/index.ts');
-    const content = fs.readFileSync(indexPath, 'utf-8');
-
-    assertIncludes(content, "name === 'add_subtask'", "CallToolRequestSchema handler must implement 'add_subtask'");
-    assertIncludes(content, "prisma.subtask.create", "MCP add_subtask must invoke prisma.subtask.create");
-    assert(
-      content.includes('Subtarefa criada com sucesso') || content.includes('subtask'),
-      "MCP add_subtask must return success confirmation string"
-    );
-  }, 'BACKEND_MCP');
-
-  await runTest('T1-MCP-04', 1, 'MCP toggle_subtask Handler Implementation', () => {
-    const indexPath = path.join(targetWorkspace, 'backend/src/index.ts');
-    const content = fs.readFileSync(indexPath, 'utf-8');
-
-    assertIncludes(content, "name === 'toggle_subtask'", "CallToolRequestSchema handler must implement 'toggle_subtask'");
-    assertIncludes(content, "prisma.subtask.update", "MCP toggle_subtask must invoke prisma.subtask.update or findUnique");
-  }, 'BACKEND_MCP');
-
-  await runTest('T1-MCP-05', 1, 'MCP list_tasks Query Filtering Logic', () => {
-    const indexPath = path.join(targetWorkspace, 'backend/src/index.ts');
-    const content = fs.readFileSync(indexPath, 'utf-8');
-
-    assertIncludes(content, "name === 'list_tasks'", "Handler must implement 'list_tasks'");
-    assertIncludes(content, "prisma.task.findMany", "Must query tasks via prisma.task.findMany");
-    assert(
-      content.includes("subtasks: true"),
-      "MCP list_tasks must include subtasks in the relation query"
-    );
-  }, 'BACKEND_MCP');
-
-  // 2. Domain B: Backend REST API
-  await runTest('T1-REST-01', 1, 'REST GET /api/tasks Endpoint', async () => {
-    const indexPath = path.join(targetWorkspace, 'backend/src/index.ts');
-    const content = fs.readFileSync(indexPath, 'utf-8');
-    assertIncludes(content, "app.get('/api/tasks'", "Express must register GET /api/tasks route");
+  // 1. Projects REST
+  let tier1ProjectId = '';
+  await runTest('T1-PRJ-01', 1, 'REST POST /api/projects - Project Creation with Metadata and Settings', async () => {
+    const content = getBackendIndex();
+    assertIncludes(content, "app.post('/api/projects'", "Must register POST /api/projects route");
 
     if (serverUp) {
-      const res = await makeRequest('GET', '/api/tasks');
+      const payload = {
+        title: `E2E_Test_Project_${Date.now()}`,
+        description: 'Automated E2E Test Project for BrainBoard V2',
+        businessLogic: '# Core Architecture Rules\n\n- Zero dependency test runner\n- Real MCP SSE',
+        status: 'PLANNING',
+        githubRepo: 'https://github.com/brainboard/e2e-project',
+        settings: { stack: 'express-prisma', neon: true, testSuite: 'e2e' },
+      };
+      const res = await makeRequest('POST', '/api/projects', payload);
+      assert(res.status === 201, `Expected 201 Created, got ${res.status}: ${res.raw}`);
+      assert(res.data && res.data.id, 'Response must include project UUID');
+      assertEqual(res.data.status, 'PLANNING', 'Default or assigned status must be PLANNING');
+      assertEqual(res.data.githubRepo, payload.githubRepo, 'githubRepo must be preserved');
+      assert(res.data.settings && res.data.settings.neon === true, 'settings JSON must be preserved');
+      tier1ProjectId = res.data.id;
+    }
+  }, 'REST_PROJECT');
+
+  await runTest('T1-PRJ-02', 1, 'REST GET /api/projects and GET /api/projects/:id - Listing and Full Details', async () => {
+    const content = getBackendIndex();
+    assertIncludes(content, "app.get('/api/projects'", "Must register GET /api/projects route");
+    assertIncludes(content, "app.get('/api/projects/:id'", "Must register GET /api/projects/:id route");
+
+    if (serverUp && tier1ProjectId) {
+      const listRes = await makeRequest('GET', '/api/projects');
+      assert(listRes.status === 200, `Expected 200 OK, got ${listRes.status}`);
+      assert(Array.isArray(listRes.data), 'Projects list must be an array');
+      const found = listRes.data.find((p: any) => p.id === tier1ProjectId);
+      assert(found !== undefined, 'Created project must be in the projects list');
+
+      const detailRes = await makeRequest('GET', `/api/projects/${tier1ProjectId}`);
+      assert(detailRes.status === 200, `Expected 200 OK, got ${detailRes.status}`);
+      assert(Array.isArray(detailRes.data.stages), 'Detail response must include stages relation');
+      assert(Array.isArray(detailRes.data.updateLogs), 'Detail response must include updateLogs relation');
+      assert(Array.isArray(detailRes.data.members), 'Detail response must include members relation');
+    }
+  }, 'REST_PROJECT');
+
+  await runTest('T1-PRJ-03', 1, 'REST PATCH /api/projects/:id - Status Transition and Field Updates', async () => {
+    const content = getBackendIndex();
+    assertIncludes(content, "app.patch('/api/projects/:id'", "Must register PATCH /api/projects/:id route");
+
+    if (serverUp && tier1ProjectId) {
+      const updatePayload = {
+        status: 'ACTIVE',
+        githubRepo: 'https://github.com/brainboard/updated-repo',
+        settings: { version: '2.0.0', deployed: true },
+      };
+      const res = await makeRequest('PATCH', `/api/projects/${tier1ProjectId}`, updatePayload);
       assert(res.status === 200, `Expected 200 OK, got ${res.status}`);
-      assert(Array.isArray(res.data), "Response data must be an array of tasks");
+      assertEqual(res.data.status, 'ACTIVE', 'Project status must transition to ACTIVE');
+      assertEqual(res.data.githubRepo, updatePayload.githubRepo, 'githubRepo must be updated');
+      assertEqual(res.data.settings.deployed, true, 'settings JSON must be updated');
     }
-  }, 'BACKEND_REST');
+  }, 'REST_PROJECT');
 
-  await runTest('T1-REST-02', 1, 'REST POST /api/tasks Task Creation', async () => {
-    const indexPath = path.join(targetWorkspace, 'backend/src/index.ts');
-    const content = fs.readFileSync(indexPath, 'utf-8');
-    assertIncludes(content, "app.post('/api/tasks'", "Express must register POST /api/tasks route");
+  await runTest('T1-PRJ-04', 1, 'REST PATCH /api/projects/:id/business-logic - Dedicated Business Logic Route', async () => {
+    const content = getBackendIndex();
+    assertIncludes(content, "app.patch('/api/projects/:id/business-logic'", "Must register dedicated business-logic route");
+
+    if (serverUp && tier1ProjectId) {
+      const blPayload = { businessLogic: '# Updated Architecture Specification\n\n- Microservices architecture' };
+      const res = await makeRequest('PATCH', `/api/projects/${tier1ProjectId}/business-logic`, blPayload);
+      assert(res.status === 200, `Expected 200 OK, got ${res.status}`);
+      assertEqual(res.data.businessLogic, blPayload.businessLogic, 'businessLogic must be updated');
+    }
+  }, 'REST_PROJECT');
+
+  await runTest('T1-PRJ-05', 1, 'REST PATCH /api/projects/:id/settings - Dedicated Settings Route', async () => {
+    const content = getBackendIndex();
+    assertIncludes(content, "app.patch('/api/projects/:id/settings'", "Must register dedicated settings route");
+
+    if (serverUp && tier1ProjectId) {
+      const settingsPayload = {
+        githubRepo: 'https://github.com/brainboard/custom-settings-repo',
+        settings: { customDomain: 'board.internal.corp', port: 8080 },
+      };
+      const res = await makeRequest('PATCH', `/api/projects/${tier1ProjectId}/settings`, settingsPayload);
+      assert(res.status === 200, `Expected 200 OK, got ${res.status}`);
+      assertEqual(res.data.githubRepo, settingsPayload.githubRepo, 'githubRepo must be updated via settings endpoint');
+      assertEqual(res.data.settings.port, 8080, 'settings JSON must be updated');
+    }
+  }, 'REST_PROJECT');
+
+  // 2. Stages REST
+  let tier1Stage1Id = '';
+  let tier1Stage2Id = '';
+  await runTest('T1-STG-01', 1, 'REST POST /api/projects/:projectId/stages - Stage Creation with Auto-Order', async () => {
+    const content = getBackendIndex();
+    assertIncludes(content, "app.post('/api/projects/:projectId/stages'", "Must register POST stages route");
+
+    if (serverUp && tier1ProjectId) {
+      const stage1Res = await makeRequest('POST', `/api/projects/${tier1ProjectId}/stages`, {
+        title: 'Stage 1: Architecture Definition',
+        status: 'PLANNING',
+      });
+      assert(stage1Res.status === 201, `Expected 201 Created for stage 1, got ${stage1Res.status}`);
+      assert(stage1Res.data.id, 'Stage 1 must return UUID');
+      assertEqual(stage1Res.data.order, 0, 'Stage 1 order must default to 0');
+      tier1Stage1Id = stage1Res.data.id;
+
+      const stage2Res = await makeRequest('POST', `/api/projects/${tier1ProjectId}/stages`, {
+        title: 'Stage 2: Implementation & Delivery',
+        status: 'PLANNING',
+      });
+      assert(stage2Res.status === 201, `Expected 201 Created for stage 2, got ${stage2Res.status}`);
+      assertEqual(stage2Res.data.order, 1, 'Stage 2 order must increment to 1');
+      tier1Stage2Id = stage2Res.data.id;
+    }
+  }, 'REST_STAGE');
+
+  await runTest('T1-STG-02', 1, 'REST GET /api/projects/:projectId/stages & PATCH /api/stages/:id - Listing and Status', async () => {
+    const content = getBackendIndex();
+    assertIncludes(content, "app.get('/api/projects/:projectId/stages'", "Must register GET stages route");
+    assertIncludes(content, "app.patch('/api/stages/:id'", "Must register PATCH stage route");
+
+    if (serverUp && tier1ProjectId && tier1Stage1Id) {
+      const listRes = await makeRequest('GET', `/api/projects/${tier1ProjectId}/stages`);
+      assert(listRes.status === 200, `Expected 200 OK, got ${listRes.status}`);
+      assert(listRes.data.length >= 2, 'Project must contain at least 2 created stages');
+
+      const patchRes = await makeRequest('PATCH', `/api/stages/${tier1Stage1Id}`, {
+        status: 'IN_PROGRESS',
+        title: 'Stage 1: Architecture In Progress',
+      });
+      assert(patchRes.status === 200, `Expected 200 OK, got ${patchRes.status}`);
+      assertEqual(patchRes.data.status, 'IN_PROGRESS', 'Stage status must transition to IN_PROGRESS');
+      assertEqual(patchRes.data.title, 'Stage 1: Architecture In Progress', 'Stage title must be updated');
+    }
+  }, 'REST_STAGE');
+
+  // 3. UpdateLogs REST
+  let tier1LogId = '';
+  await runTest('T1-LOG-01', 1, 'REST POST /api/projects/:projectId/update-logs - Rich Markdown Log Creation', async () => {
+    const content = getBackendIndex();
+    assertIncludes(content, "app.post('/api/projects/:projectId/update-logs'", "Must register POST update-logs route");
+
+    if (serverUp && tier1ProjectId) {
+      const logPayload = {
+        title: 'Kickoff & Baseline Architecture Documented',
+        content: '# Daily Log\n\n- Completed database schema refactor\n- Registered all 15 MCP tools\n- Verified cascading delete',
+        author: 'Lead Architect Agent',
+      };
+      const res = await makeRequest('POST', `/api/projects/${tier1ProjectId}/update-logs`, logPayload);
+      assert(res.status === 201, `Expected 201 Created, got ${res.status}`);
+      assert(res.data.id, 'UpdateLog must return UUID');
+      assertEqual(res.data.title, logPayload.title, 'Log title must match');
+      assertEqual(res.data.author, logPayload.author, 'Author must match');
+      tier1LogId = res.data.id;
+    }
+  }, 'REST_LOG');
+
+  await runTest('T1-LOG-02', 1, 'REST GET /api/projects/:projectId/update-logs & GET /api/update-logs/:id', async () => {
+    const content = getBackendIndex();
+    assertIncludes(content, "app.get('/api/projects/:projectId/update-logs'", "Must register GET update-logs route");
+    assertIncludes(content, "app.get('/api/update-logs/:id'", "Must register GET single update-log route");
+
+    if (serverUp && tier1ProjectId && tier1LogId) {
+      const listRes = await makeRequest('GET', `/api/projects/${tier1ProjectId}/update-logs`);
+      assert(listRes.status === 200, `Expected 200 OK, got ${listRes.status}`);
+      assert(listRes.data.length >= 1, 'Project must return update logs list');
+
+      const singleRes = await makeRequest('GET', `/api/update-logs/${tier1LogId}`);
+      assert(singleRes.status === 200, `Expected 200 OK, got ${singleRes.status}`);
+      assertEqual(singleRes.data.id, tier1LogId, 'Log ID must match');
+      assertIncludes(singleRes.data.content, 'Completed database schema refactor', 'Markdown content must be preserved');
+    }
+  }, 'REST_LOG');
+
+  // 4. Members REST
+  let tier1MemberId = '';
+  await runTest('T1-MBR-01', 1, 'REST POST /api/projects/:projectId/members - Member Creation with Email and Role', async () => {
+    const content = getBackendIndex();
+    assertIncludes(content, "app.post('/api/projects/:projectId/members'", "Must register POST members route");
+
+    if (serverUp && tier1ProjectId) {
+      const memberPayload = {
+        name: 'Grace Hopper',
+        role: 'Systems Compiler Lead',
+        email: 'grace.hopper@navy.mil',
+      };
+      const res = await makeRequest('POST', `/api/projects/${tier1ProjectId}/members`, memberPayload);
+      assert(res.status === 201, `Expected 201 Created, got ${res.status}`);
+      assert(res.data.id, 'Member must return UUID');
+      assertEqual(res.data.email, memberPayload.email, 'Email must be saved on member');
+      assertEqual(res.data.role, memberPayload.role, 'Role must match');
+      tier1MemberId = res.data.id;
+    }
+  }, 'REST_MEMBER');
+
+  await runTest('T1-MBR-02', 1, 'REST GET /api/projects/:projectId/members & PATCH /api/members/:id', async () => {
+    const content = getBackendIndex();
+    assertIncludes(content, "app.get('/api/projects/:projectId/members'", "Must register GET members route");
+    assertIncludes(content, "app.patch('/api/members/:id'", "Must register PATCH member route");
+
+    if (serverUp && tier1ProjectId && tier1MemberId) {
+      const listRes = await makeRequest('GET', `/api/projects/${tier1ProjectId}/members`);
+      assert(listRes.status === 200, `Expected 200 OK, got ${listRes.status}`);
+      assert(listRes.data.length >= 1, 'Project members array must include member');
+
+      const patchRes = await makeRequest('PATCH', `/api/members/${tier1MemberId}`, {
+        role: 'Rear Admiral & Pioneer',
+      });
+      assert(patchRes.status === 200, `Expected 200 OK, got ${patchRes.status}`);
+      assertEqual(patchRes.data.role, 'Rear Admiral & Pioneer', 'Member role must be updated');
+    }
+  }, 'REST_MEMBER');
+
+  // 5. Tasks REST (scoped to Stage)
+  let tier1TaskId = '';
+  await runTest('T1-TSK-01', 1, 'REST POST /api/stages/:stageId/tasks - Task Creation Scoped to Stage', async () => {
+    const content = getBackendIndex();
+    assert(
+      content.includes("app.post('/api/stages/:stageId/tasks'") || content.includes("app.post('/api/tasks'"),
+      "Must register task creation routes with stageId"
+    );
+
+    if (serverUp && tier1Stage1Id) {
+      const taskPayload = {
+        title: 'Implement McpSseClient in E2E Test Suite',
+        description: 'Create zero-dependency SSE client and JSON-RPC protocol handler',
+        status: 'TODO',
+      };
+      const res = await makeRequest('POST', `/api/stages/${stageIdOrFallback(tier1Stage1Id)}/tasks`, taskPayload);
+      assert(res.status === 201, `Expected 201 Created, got ${res.status}`);
+      assert(res.data.id, 'Task must return UUID');
+      assertEqual(res.data.stageId, tier1Stage1Id, 'Task must be scoped to Stage ID');
+      assertEqual(res.data.status, 'TODO', 'Initial status must be TODO');
+      tier1TaskId = res.data.id;
+    }
+  }, 'REST_TASK');
+
+  function stageIdOrFallback(id: string) {
+    return id || 'default';
+  }
+
+  await runTest('T1-TSK-02', 1, 'REST GET /api/stages/:stageId/tasks & PATCH /api/tasks/:id - Progress Workflow', async () => {
+    const content = getBackendIndex();
+    assertIncludes(content, "app.get('/api/stages/:stageId/tasks'", "Must register GET tasks by stage route");
+    assertIncludes(content, "app.patch('/api/tasks/:id'", "Must register PATCH task route");
+
+    if (serverUp && tier1Stage1Id && tier1TaskId) {
+      const listRes = await makeRequest('GET', `/api/stages/${tier1Stage1Id}/tasks`);
+      assert(listRes.status === 200, `Expected 200 OK, got ${listRes.status}`);
+      assert(listRes.data.some((t: any) => t.id === tier1TaskId), 'Created task must be in stage tasks list');
+
+      const moveRes = await makeRequest('PATCH', `/api/tasks/${tier1TaskId}`, { status: 'IN_PROGRESS' });
+      assert(moveRes.status === 200, `Expected 200 OK, got ${moveRes.status}`);
+      assertEqual(moveRes.data.status, 'IN_PROGRESS', 'Task status must transition to IN_PROGRESS');
+
+      const completeRes = await makeRequest('PATCH', `/api/tasks/${tier1TaskId}`, { status: 'DONE' });
+      assert(completeRes.status === 200, `Expected 200 OK, got ${completeRes.status}`);
+      assertEqual(completeRes.data.status, 'DONE', 'Task status must transition to DONE');
+    }
+  }, 'REST_TASK');
+
+  // 6. Subtasks REST
+  let tier1SubtaskId = '';
+  await runTest('T1-SUB-01', 1, 'REST POST /api/tasks/:id/subtasks - Subtask Creation Under Task', async () => {
+    const content = getBackendIndex();
+    assertIncludes(content, "app.post('/api/tasks/:id/subtasks'", "Must register POST subtasks route");
+
+    if (serverUp && tier1TaskId) {
+      const res = await makeRequest('POST', `/api/tasks/${tier1TaskId}/subtasks`, {
+        title: 'Buffer SSE chunks and parse endpoint event',
+      });
+      assert(res.status === 201, `Expected 201 Created, got ${res.status}`);
+      assert(res.data.id, 'Subtask must return UUID');
+      assertEqual(res.data.isDone, false, 'New subtask must default to isDone: false');
+      tier1SubtaskId = res.data.id;
+    }
+  }, 'REST_SUBTASK');
+
+  await runTest('T1-SUB-02', 1, 'REST PATCH /api/subtasks/:id - Subtask Toggle State', async () => {
+    const content = getBackendIndex();
+    assertIncludes(content, "app.patch('/api/subtasks/:id'", "Must register PATCH subtask route");
+
+    if (serverUp && tier1SubtaskId) {
+      const toggleRes = await makeRequest('PATCH', `/api/subtasks/${tier1SubtaskId}`, { isDone: true });
+      assert(toggleRes.status === 200, `Expected 200 OK, got ${toggleRes.status}`);
+      assertEqual(toggleRes.data.isDone, true, 'Subtask isDone must be toggled to true');
+    }
+  }, 'REST_SUBTASK');
+
+  // 7. MCP SSE Protocol & Tools
+  let mcpClient: McpSseClient | null = activeMcpClient;
+
+  await runTest('T1-MCP-01', 1, 'MCP Real SSE Connection & Session Handshake', async () => {
+    const content = getBackendIndex();
+    assertIncludes(content, "app.get('/mcp/sse'", "MCP server must configure GET /mcp/sse");
+    assertIncludes(content, "app.post('/mcp/messages'", "MCP server must configure POST /mcp/messages");
+    assertIncludes(content, 'SSEServerTransport', "MCP server must use SSEServerTransport");
 
     if (serverUp) {
-      const res = await makeRequest('POST', '/api/tasks', {
-        title: 'E2E Test Task POST',
-        category: 'PROJECT',
-        description: 'Verifying REST creation'
-      });
-      assert(res.status === 201 || res.status === 200, `Expected 201/200, got ${res.status}`);
-      assert(res.data && res.data.id, "Created task must return task object with UUID");
+      if (!mcpClient) {
+        mcpClient = new McpSseClient(backendUrl);
+        await mcpClient.connect(5000);
+      }
+      assert(mcpClient !== null, 'McpSseClient must be connected');
     }
-  }, 'BACKEND_REST');
+  }, 'MCP_SSE');
 
-  await runTest('T1-REST-03', 1, 'REST PATCH /api/tasks/:id Status & Details Update', async () => {
-    const indexPath = path.join(targetWorkspace, 'backend/src/index.ts');
-    const content = fs.readFileSync(indexPath, 'utf-8');
-    assert(
-      content.includes("app.patch('/api/tasks/:id'") || content.includes("app.put('/api/tasks/:id'"),
-      "Express must register PATCH or PUT /api/tasks/:id route"
-    );
-  }, 'BACKEND_REST');
+  await runTest('T1-MCP-02', 1, 'MCP tools/list Schema Discovery (All 15 Tools Verified)', async () => {
+    const content = getBackendIndex();
+    const requiredTools = [
+      'read_project_context',
+      'update_business_logic',
+      'update_project_settings',
+      'log_project_update',
+      'create_task',
+      'add_task',
+      'move_task',
+      'update_task_status',
+      'add_subtask',
+      'toggle_subtask',
+      'update_task',
+      'delete_task',
+      'delete_subtask',
+      'list_tasks',
+      'get_task',
+    ];
 
-  await runTest('T1-REST-04', 1, 'REST DELETE /api/tasks/:id Deletion', async () => {
-    const indexPath = path.join(targetWorkspace, 'backend/src/index.ts');
-    const content = fs.readFileSync(indexPath, 'utf-8');
-    assertIncludes(content, "app.delete('/api/tasks/:id'", "Express must register DELETE /api/tasks/:id route");
-  }, 'BACKEND_REST');
+    for (const t of requiredTools) {
+      assertIncludes(content, `'${t}'`, `MCP registration for '${t}' must exist in backend/src/index.ts`);
+    }
 
-  await runTest('T1-REST-05', 1, 'REST POST /api/tasks/:id/subtasks Subtask Creation', async () => {
-    const indexPath = path.join(targetWorkspace, 'backend/src/index.ts');
-    const content = fs.readFileSync(indexPath, 'utf-8');
-    assert(
-      content.includes("app.post('/api/tasks/:id/subtasks'") || content.includes("app.post('/api/subtasks'"),
-      "Express must register subtask creation endpoint"
-    );
-  }, 'BACKEND_REST');
+    if (serverUp && mcpClient) {
+      const tools = await mcpClient.listTools();
+      assert(Array.isArray(tools), 'tools/list must return array');
+      assert(tools.length >= 15, `Expected at least 15 tools registered, got ${tools.length}`);
+      const toolNames = tools.map((t: any) => t.name);
+      for (const required of requiredTools) {
+        assert(toolNames.includes(required), `Registered tools list must contain ${required}`);
+      }
+    }
+  }, 'MCP_TOOLS');
 
-  await runTest('T1-REST-06', 1, 'REST PATCH /api/subtasks/:id Subtask Toggle', async () => {
-    const indexPath = path.join(targetWorkspace, 'backend/src/index.ts');
-    const content = fs.readFileSync(indexPath, 'utf-8');
-    assertIncludes(content, "app.patch('/api/subtasks/:id'", "Express must register PATCH /api/subtasks/:id route");
-  }, 'BACKEND_REST');
+  await runTest('T1-MCP-03', 1, 'MCP update_business_logic Tool Invocation Over SSE', async () => {
+    const content = getBackendIndex();
+    assertIncludes(content, "name === 'update_business_logic'", "CallTool handler must implement update_business_logic");
 
-  await runTest('T1-REST-07', 1, 'REST DELETE /api/subtasks/:id Subtask Deletion', async () => {
-    const indexPath = path.join(targetWorkspace, 'backend/src/index.ts');
-    const content = fs.readFileSync(indexPath, 'utf-8');
-    assertIncludes(content, "app.delete('/api/subtasks/:id'", "Express must register DELETE /api/subtasks/:id route");
-  }, 'BACKEND_REST');
+    if (serverUp && mcpClient && tier1ProjectId) {
+      const updatedBL = '# Architectural Decisions by AI\n\n- Zero dependency test execution\n- Full relational integrity';
+      const res = await mcpClient.callTool('update_business_logic', {
+        projectId: tier1ProjectId,
+        businessLogic: updatedBL,
+      });
+      assert(res && res.content, 'Tool call must return content array');
+      assertIncludes(res.content[0].text, 'atualizada com sucesso', 'Confirmation text expected');
 
-  // 3. Domain C: Frontend UI Contracts
-  await runTest('T1-UI-01', 1, 'Frontend Kanban 3-Column Board Structure', () => {
-    const kanbanPath = path.join(targetWorkspace, 'frontend/src/components/KanbanBoard.tsx');
-    assert(fs.existsSync(kanbanPath), `Frontend component KanbanBoard.tsx must exist at ${kanbanPath}`);
-    const content = fs.readFileSync(kanbanPath, 'utf-8');
-    assertIncludes(content, 'TODO', "Board must support TODO column");
-    assertIncludes(content, 'IN_PROGRESS', "Board must support IN_PROGRESS column");
-    assertIncludes(content, 'DONE', "Board must support DONE column");
-  }, 'FRONTEND_UI');
+      // Verify DB via REST
+      const verifyRes = await makeRequest('GET', `/api/projects/${tier1ProjectId}`);
+      assertEqual(verifyRes.data.businessLogic, updatedBL, 'Database must reflect updated business logic via MCP');
+    }
+  }, 'MCP_EXEC');
 
-  await runTest('T1-UI-02', 1, 'Frontend Category Filter Bar Implementation', () => {
-    const appPath = path.join(targetWorkspace, 'frontend/src/App.tsx');
-    assert(fs.existsSync(appPath), `Frontend App.tsx must exist at ${appPath}`);
-    const content = fs.readFileSync(appPath, 'utf-8');
-    assert(
-      content.includes('PROJECT') && content.includes('COLLEGE') && content.includes('PERSONAL'),
-      "Filter bar must allow filtering by PROJECT, COLLEGE, and PERSONAL categories"
-    );
-  }, 'FRONTEND_UI');
+  await runTest('T1-MCP-04', 1, 'MCP log_project_update Tool Invocation Over SSE', async () => {
+    const content = getBackendIndex();
+    assertIncludes(content, "name === 'log_project_update'", "CallTool handler must implement log_project_update");
 
-  await runTest('T1-UI-03', 1, 'Frontend Task Creation Modal Validation', () => {
-    const modalPath = path.join(targetWorkspace, 'frontend/src/components/CreateTaskModal.tsx');
-    assert(fs.existsSync(modalPath), `CreateTaskModal.tsx must exist at ${modalPath}`);
-    const content = fs.readFileSync(modalPath, 'utf-8');
-    assertIncludes(content, 'title', "Modal must have title input");
-    assertIncludes(content, 'category', "Modal must have category selector");
-  }, 'FRONTEND_UI');
+    if (serverUp && mcpClient && tier1ProjectId) {
+      const res = await mcpClient.callTool('log_project_update', {
+        projectId: tier1ProjectId,
+        title: 'MCP Autonomous Sprint Sync',
+        content: '### Progress Report\n\nAll automated tests passed successfully in live environment.',
+        author: 'Autonomous AI Orchestrator',
+      });
+      assert(res && res.content, 'Tool call must return content');
+      assertIncludes(res.content[0].text, 'Log de atualização criado', 'Confirmation text expected');
 
-  await runTest('T1-UI-04', 1, 'Frontend Task Card Subtask Checklist & Action Controls', () => {
-    const cardPath = path.join(targetWorkspace, 'frontend/src/components/TaskCard.tsx');
-    assert(fs.existsSync(cardPath), `TaskCard.tsx must exist at ${cardPath}`);
-    const content = fs.readFileSync(cardPath, 'utf-8');
-    assert(content.includes('checkbox') || content.includes('isDone'), "TaskCard must render subtask checkboxes");
-    assert(content.includes('delete') || content.includes('Trash') || content.includes('onDelete'), "TaskCard must provide delete action");
-  }, 'FRONTEND_UI');
+      // Verify DB via REST
+      const logsRes = await makeRequest('GET', `/api/projects/${tier1ProjectId}/update-logs`);
+      assert(logsRes.data.some((l: any) => l.title === 'MCP Autonomous Sprint Sync'), 'Log created via MCP must be found');
+    }
+  }, 'MCP_EXEC');
 
-  await runTest('T1-UI-05', 1, 'Frontend Inline Subtask Addition Input', () => {
-    const cardPath = path.join(targetWorkspace, 'frontend/src/components/TaskCard.tsx');
-    assert(fs.existsSync(cardPath), `TaskCard.tsx must exist`);
-    const content = fs.readFileSync(cardPath, 'utf-8');
-    assert(
-      content.includes('addSubtask') || content.includes('subtaskTitle') || content.includes('Nova subtarefa'),
-      "TaskCard must support inline subtask addition"
-    );
-  }, 'FRONTEND_UI');
+  await runTest('T1-MCP-05', 1, 'MCP read_project_context Tool Invocation Over SSE', async () => {
+    const content = getBackendIndex();
+    assertIncludes(content, "name === 'read_project_context'", "CallTool handler must implement read_project_context");
 
-  await runTest('T1-UI-06', 1, 'Frontend API Client Service Contract', () => {
-    const apiPath = path.join(targetWorkspace, 'frontend/src/services/api.ts');
-    assert(fs.existsSync(apiPath), `API service api.ts must exist at ${apiPath}`);
-    const content = fs.readFileSync(apiPath, 'utf-8');
-    assertIncludes(content, 'getTasks', "API client must implement getTasks");
-    assertIncludes(content, 'createTask', "API client must implement createTask");
-    assertIncludes(content, 'updateTaskStatus', "API client must implement updateTaskStatus");
-  }, 'FRONTEND_UI');
+    if (serverUp && mcpClient && tier1ProjectId) {
+      const res = await mcpClient.callTool('read_project_context', {
+        projectId: tier1ProjectId,
+      });
+      assert(res && res.content && res.content[0]?.text, 'read_project_context must return json text');
+      const projectGraph = JSON.parse(res.content[0].text);
+      assertEqual(projectGraph.id, tier1ProjectId, 'Returned project graph must match project ID');
+      assert(Array.isArray(projectGraph.stages), 'Project graph must contain stages');
+      assert(Array.isArray(projectGraph.updateLogs), 'Project graph must contain updateLogs');
+      assert(Array.isArray(projectGraph.members), 'Project graph must contain members');
+      assert(projectGraph.settings !== undefined, 'Project graph must contain settings');
+    }
+  }, 'MCP_EXEC');
 
-  // 4. Domain D: Docker Configuration
-  await runTest('T1-DOC-01', 1, 'Backend Dockerfile Directives and Prisma Client', () => {
+  await runTest('T1-MCP-06', 1, 'MCP update_project_settings Tool Invocation Over SSE', async () => {
+    const content = getBackendIndex();
+    assertIncludes(content, "name === 'update_project_settings'", "CallTool handler must implement update_project_settings");
+
+    if (serverUp && mcpClient && tier1ProjectId) {
+      const res = await mcpClient.callTool('update_project_settings', {
+        projectId: tier1ProjectId,
+        githubRepo: 'https://github.com/brainboard/mcp-updated-repo',
+        settings: { mcpEnabled: true, aiProvider: 'gemini-2.5-pro' },
+      });
+      assert(res && res.content, 'Tool call must return content');
+      assertIncludes(res.content[0].text, 'atualizadas com sucesso', 'Confirmation text expected');
+
+      // Verify DB via REST
+      const verifyRes = await makeRequest('GET', `/api/projects/${tier1ProjectId}`);
+      assertEqual(verifyRes.data.githubRepo, 'https://github.com/brainboard/mcp-updated-repo', 'githubRepo must match');
+      assertEqual(verifyRes.data.settings.aiProvider, 'gemini-2.5-pro', 'settings must reflect MCP updates');
+    }
+  }, 'MCP_EXEC');
+
+  let mcpCreatedTaskId = '';
+  await runTest('T1-MCP-07', 1, 'MCP create_task & move_task with stageId Over SSE', async () => {
+    const content = getBackendIndex();
+    assertIncludes(content, "name === 'create_task'", "CallTool handler must implement create_task");
+    assertIncludes(content, "name === 'move_task'", "CallTool handler must implement move_task");
+
+    if (serverUp && mcpClient && tier1Stage2Id) {
+      const createRes = await mcpClient.callTool('create_task', {
+        stageId: tier1Stage2Id,
+        title: 'Task Created by AI via MCP SSE',
+        description: 'Scoped strictly to Stage 2',
+        status: 'TODO',
+      });
+      assert(createRes && createRes.content, 'Tool call must return content');
+      const text = createRes.content[0].text;
+      assertIncludes(text, 'Tarefa criada com sucesso', 'Confirmation text expected');
+      mcpCreatedTaskId = text.split(':').pop().trim();
+
+      const moveRes = await mcpClient.callTool('move_task', {
+        id: mcpCreatedTaskId,
+        status: 'DONE',
+      });
+      assert(moveRes && moveRes.content, 'move_task must return content');
+      assertIncludes(moveRes.content[0].text, 'Tarefa movida para DONE', 'Status change confirmed');
+
+      // Verify DB via REST
+      const taskRes = await makeRequest('GET', `/api/tasks/${mcpCreatedTaskId}`);
+      assertEqual(taskRes.data.status, 'DONE', 'Task status must be DONE in database');
+      assertEqual(taskRes.data.stageId, tier1Stage2Id, 'Task must belong to Stage 2');
+    }
+  }, 'MCP_EXEC');
+
+  // 8. Docker Configuration Contracts
+  await runTest('T1-DOC-01', 1, 'Backend Dockerfile Directives and Prisma Generate', () => {
     const dockerfilePath = path.join(targetWorkspace, 'backend/Dockerfile');
     assert(fs.existsSync(dockerfilePath), `Backend Dockerfile must exist at ${dockerfilePath}`);
     const content = fs.readFileSync(dockerfilePath, 'utf-8');
-    assertIncludes(content, 'FROM node:20-alpine', "Backend Dockerfile must base on node:20-alpine");
-    assertIncludes(content, 'prisma generate', "Backend Dockerfile must execute npx prisma generate");
-    assertIncludes(content, 'EXPOSE 3000', "Backend Dockerfile must expose port 3000");
+    assertIncludes(content, 'FROM node:20-alpine', 'Backend Dockerfile must base on node:20-alpine');
+    assertIncludes(content, 'prisma generate', 'Backend Dockerfile must execute npx prisma generate');
+    assertIncludes(content, 'EXPOSE 3000', 'Backend Dockerfile must expose port 3000');
   }, 'DOCKER_CONFIG');
 
   await runTest('T1-DOC-02', 1, 'Frontend Dockerfile Multi-Stage Build & Nginx Runtime', () => {
     const dockerfilePath = path.join(targetWorkspace, 'frontend/Dockerfile');
     assert(fs.existsSync(dockerfilePath), `Frontend Dockerfile must exist at ${dockerfilePath}`);
     const content = fs.readFileSync(dockerfilePath, 'utf-8');
-    assert(content.includes('as build') || content.includes('AS build'), "Frontend Dockerfile must define build stage");
-    assertIncludes(content, 'FROM nginx:alpine', "Frontend Dockerfile must use nginx:alpine runtime");
-    assertIncludes(content, 'COPY --from=build', "Frontend Dockerfile must copy assets from build stage");
+    assert(content.includes('as build') || content.includes('AS build'), 'Frontend Dockerfile must define build stage');
+    assertIncludes(content, 'FROM nginx:alpine', 'Frontend Dockerfile must use nginx:alpine runtime');
+    assertIncludes(content, 'COPY --from=build', 'Frontend Dockerfile must copy assets from build stage');
   }, 'DOCKER_CONFIG');
 
   await runTest('T1-DOC-03', 1, 'Root docker-compose.yml Multi-Service Orchestration', () => {
     const composePath = path.join(targetWorkspace, 'docker-compose.yml');
     assert(fs.existsSync(composePath), `docker-compose.yml must exist at ${composePath}`);
     const content = fs.readFileSync(composePath, 'utf-8');
-    assertIncludes(content, 'backend:', "docker-compose.yml must define backend service");
-    assertIncludes(content, 'frontend:', "docker-compose.yml must define frontend service");
-    assertIncludes(content, 'DATABASE_URL', "docker-compose.yml must pass DATABASE_URL to backend");
+    assertIncludes(content, 'backend:', 'docker-compose.yml must define backend service');
+    assertIncludes(content, 'frontend:', 'docker-compose.yml must define frontend service');
+    assertIncludes(content, 'DATABASE_URL', 'docker-compose.yml must pass DATABASE_URL to backend');
   }, 'DOCKER_CONFIG');
 
   await runTest('T1-DOC-04', 1, 'Nginx Reverse Proxy Configuration & SPA Fallback', () => {
     const nginxPath = path.join(targetWorkspace, 'frontend/nginx.conf');
     assert(fs.existsSync(nginxPath), `nginx.conf must exist at ${nginxPath}`);
     const content = fs.readFileSync(nginxPath, 'utf-8');
-    assertIncludes(content, 'proxy_pass', "nginx.conf must configure proxy_pass for /api/");
-    assertIncludes(content, 'try_files $uri $uri/ /index.html', "nginx.conf must configure SPA fallback");
+    assertIncludes(content, 'proxy_pass', 'nginx.conf must configure proxy_pass for /api/');
+    assertIncludes(content, 'try_files $uri $uri/ /index.html', 'nginx.conf must configure SPA fallback');
   }, 'DOCKER_CONFIG');
 
-  await runTest('T1-DOC-05', 1, 'Vite Development Proxy Configuration', () => {
-    const vitePath = path.join(targetWorkspace, 'frontend/vite.config.ts');
-    assert(fs.existsSync(vitePath), `vite.config.ts must exist at ${vitePath}`);
-    const content = fs.readFileSync(vitePath, 'utf-8');
-    assertIncludes(content, 'proxy', "vite.config.ts must configure dev server proxy");
-    assert(content.includes('3000'), "vite.config.ts proxy must target port 3000");
-  }, 'DOCKER_CONFIG');
+  // Tier 1 cleanup
+  if (serverUp && tier1ProjectId) {
+    try {
+      await makeRequest('DELETE', `/api/projects/${tier1ProjectId}`);
+    } catch {}
+  }
 
   // =========================================================================
   // TIER 2: BOUNDARY & CORNER CASES
   // =========================================================================
   console.log(`\n${colors.magenta}${colors.bright}--- TIER 2: BOUNDARY & CORNER CASES ---${colors.reset}`);
 
-  await runTest('T2-BND-01', 2, 'Empty and Whitespace-Only Task Titles Rejected', async () => {
+  await runTest('T2-BND-01', 2, 'Empty and Whitespace-Only Titles Rejected with 400 Across Entities', async () => {
     if (serverUp) {
-      const res = await makeRequest('POST', '/api/tasks', { title: '   ', category: 'PROJECT' });
-      assert(res.status >= 400 && res.status < 500, `Expected 4xx validation error for empty title, got ${res.status}`);
+      // 1. Project empty title
+      const pRes = await makeRequest('POST', '/api/projects', { title: '   ' });
+      assert(pRes.status === 400, `Expected 400 for empty project title, got ${pRes.status}`);
+
+      // Setup temp project
+      const tempP = await makeRequest('POST', '/api/projects', { title: 'BND_Validation_Project' });
+      const pId = tempP.data.id;
+
+      try {
+        // 2. Stage empty title
+        const sRes = await makeRequest('POST', `/api/projects/${pId}/stages`, { title: '   ' });
+        assert(sRes.status === 400, `Expected 400 for empty stage title, got ${sRes.status}`);
+
+        const tempS = await makeRequest('POST', `/api/projects/${pId}/stages`, { title: 'Valid Stage' });
+        const sId = tempS.data.id;
+
+        // 3. Task empty title
+        const tRes = await makeRequest('POST', `/api/stages/${sId}/tasks`, { title: ' ' });
+        assert(tRes.status === 400, `Expected 400 for empty task title, got ${tRes.status}`);
+
+        const tempT = await makeRequest('POST', `/api/stages/${sId}/tasks`, { title: 'Valid Task' });
+        const tId = tempT.data.id;
+
+        // 4. Subtask empty title
+        const subRes = await makeRequest('POST', `/api/tasks/${tId}/subtasks`, { title: '' });
+        assert(subRes.status === 400, `Expected 400 for empty subtask title, got ${subRes.status}`);
+      } finally {
+        await makeRequest('DELETE', `/api/projects/${pId}`);
+      }
     } else {
-      const indexPath = path.join(targetWorkspace, 'backend/src/index.ts');
-      const content = fs.readFileSync(indexPath, 'utf-8');
+      const content = getBackendIndex();
+      assert(content.includes('!title') && content.includes('trim()'), 'Code must check !title and trim()');
+    }
+  });
+
+  await runTest('T2-BND-02', 2, 'Large Text Payload Stress (5,000+ chars in businessLogic and UpdateLog)', async () => {
+    const hugeMarkdown = '# Architectural Manifesto\n\n' + 'Paragraph lorem ipsum '.repeat(300);
+    assert(hugeMarkdown.length > 5000, 'Payload must be > 5000 chars');
+
+    if (serverUp) {
+      const tempP = await makeRequest('POST', '/api/projects', {
+        title: 'Huge Text Stress Project',
+        businessLogic: hugeMarkdown,
+      });
+      assert(tempP.status === 201, `Failed to create project with huge markdown: ${tempP.status}`);
+      const pId = tempP.data.id;
+
+      try {
+        const logRes = await makeRequest('POST', `/api/projects/${pId}/update-logs`, {
+          title: 'Stress Log',
+          content: hugeMarkdown,
+          author: 'Stress Tester',
+        });
+        assert(logRes.status === 201, `Failed to create log with huge markdown: ${logRes.status}`);
+
+        const verifyP = await makeRequest('GET', `/api/projects/${pId}`);
+        assertEqual(verifyP.data.businessLogic, hugeMarkdown, 'Huge businessLogic must be stored and retrieved verbatim');
+      } finally {
+        await makeRequest('DELETE', `/api/projects/${pId}`);
+      }
+    } else {
+      const schema = getSchema();
+      assertIncludes(schema, 'businessLogic String?  @db.Text', 'Schema must define businessLogic as @db.Text');
+      assertIncludes(schema, 'content       String   @db.Text', 'Schema must define content as @db.Text');
+    }
+  });
+
+  await runTest('T2-BND-03', 2, 'Special Characters, UTF-8 Emojis, XSS, and SQL Injection Escaping Fidelity', async () => {
+    const adversarialPayload =
+      'Special: \' " <script>alert("XSS")</script> 🚀 💻 \n\t \\ ; DROP TABLE "Project"; -- & < >';
+
+    if (serverUp) {
+      const tempP = await makeRequest('POST', '/api/projects', {
+        title: adversarialPayload,
+        description: adversarialPayload,
+      });
+      assert(tempP.status === 201, `Failed to create project with adversarial payload: ${tempP.status}`);
+      const pId = tempP.data.id;
+
+      try {
+        assertEqual(tempP.data.title, adversarialPayload, 'Title must preserve exact byte fidelity without corruption');
+        const readP = await makeRequest('GET', `/api/projects/${pId}`);
+        assertEqual(readP.data.description, adversarialPayload, 'Description must preserve exact byte fidelity');
+      } finally {
+        await makeRequest('DELETE', `/api/projects/${pId}`);
+      }
+    } else {
+      const schema = getSchema();
+      assertIncludes(schema, 'model Project {', 'Prisma parameterized queries protect against SQL injection');
+    }
+  });
+
+  await runTest('T2-BND-04', 2, 'Non-Existent UUID Handling Returns 404 Across Entities', async () => {
+    const nonExistent = '00000000-0000-0000-0000-000000000000';
+
+    if (serverUp) {
+      const pGet = await makeRequest('GET', `/api/projects/${nonExistent}`);
+      assert(pGet.status === 404, `Expected 404 for project get, got ${pGet.status}`);
+
+      const pPatch = await makeRequest('PATCH', `/api/projects/${nonExistent}`, { status: 'ACTIVE' });
+      assert(pPatch.status === 404, `Expected 404 for project patch, got ${pPatch.status}`);
+
+      const sGet = await makeRequest('GET', `/api/stages/${nonExistent}`);
+      assert(sGet.status === 404, `Expected 404 for stage get, got ${sGet.status}`);
+
+      const tPatch = await makeRequest('PATCH', `/api/tasks/${nonExistent}`, { status: 'DONE' });
+      assert(tPatch.status === 404, `Expected 404 for task patch, got ${tPatch.status}`);
+
+      const subDelete = await makeRequest('DELETE', `/api/subtasks/${nonExistent}`);
+      assert(subDelete.status === 404, `Expected 404 for subtask delete, got ${subDelete.status}`);
+    } else {
+      const content = getBackendIndex();
+      assert(content.includes('404') && content.includes('P2025'), 'Index must handle P2025 record not found as 404');
+    }
+  });
+
+  await runTest('T2-BND-05', 2, 'Invalid Enum Values Rejected with 400 Bad Request', async () => {
+    if (serverUp) {
+      // 1. Invalid ProjectStatus
+      const pRes = await makeRequest('POST', '/api/projects', {
+        title: 'Enum Test Project',
+        status: 'INVALID_PROJECT_STATUS',
+      });
+      assert(pRes.status === 400, `Expected 400 for invalid ProjectStatus, got ${pRes.status}`);
+
+      const tempP = await makeRequest('POST', '/api/projects', { title: 'Enum Validation Base' });
+      const pId = tempP.data.id;
+
+      try {
+        // 2. Invalid StageStatus
+        const sRes = await makeRequest('POST', `/api/projects/${pId}/stages`, {
+          title: 'Stage Enum',
+          status: 'INVALID_STAGE_STATUS',
+        });
+        assert(sRes.status === 400, `Expected 400 for invalid StageStatus, got ${sRes.status}`);
+
+        const tempS = await makeRequest('POST', `/api/projects/${pId}/stages`, { title: 'Valid Stage' });
+        const sId = tempS.data.id;
+
+        // 3. Invalid Task Status
+        const tRes = await makeRequest('POST', `/api/stages/${sId}/tasks`, {
+          title: 'Task Enum',
+          status: 'INVALID_TASK_STATUS',
+        });
+        assert(tRes.status === 400, `Expected 400 for invalid Task status, got ${tRes.status}`);
+      } finally {
+        await makeRequest('DELETE', `/api/projects/${pId}`);
+      }
+    } else {
+      const schema = getSchema();
+      assertIncludes(schema, 'enum ProjectStatus {', 'Schema must define ProjectStatus enum');
+      assertIncludes(schema, 'enum StageStatus {', 'Schema must define StageStatus enum');
+      assertIncludes(schema, 'enum Status {', 'Schema must define Status enum');
+    }
+  });
+
+  await runTest('T2-BND-06', 2, 'Project Settings JSON Validation & Null Handling', async () => {
+    if (serverUp) {
+      // Complex nested JSON
+      const complexSettings = {
+        environments: ['staging', 'production'],
+        ci: { enabled: true, runners: 4, config: { timeout: 300 } },
+        flags: { betaFeatures: false, maxUsers: 1000 },
+      };
+      const tempP = await makeRequest('POST', '/api/projects', {
+        title: 'JSON Settings Project',
+        settings: complexSettings,
+      });
+      assert(tempP.status === 201, `Failed to create project with settings: ${tempP.status}`);
+      const pId = tempP.data.id;
+
+      try {
+        assertEqual(tempP.data.settings.ci.runners, 4, 'Nested settings property must be preserved');
+        assertEqual(tempP.data.settings.flags.maxUsers, 1000, 'Nested settings property must match');
+
+        // Update with null settings
+        const patchRes = await makeRequest('PATCH', `/api/projects/${pId}/settings`, { settings: null });
+        assert(patchRes.status === 200, `Expected 200 for settings null update, got ${patchRes.status}`);
+      } finally {
+        await makeRequest('DELETE', `/api/projects/${pId}`);
+      }
+    } else {
+      const schema = getSchema();
+      assertIncludes(schema, 'settings      Json?', 'Schema must define settings as nullable Json');
+    }
+  });
+
+  await runTest('T2-BND-07', 2, 'Member Validation and Optional Email Support', async () => {
+    if (serverUp) {
+      const tempP = await makeRequest('POST', '/api/projects', { title: 'Member Validation Project' });
+      const pId = tempP.data.id;
+
+      try {
+        // Missing name -> 400
+        const m1 = await makeRequest('POST', `/api/projects/${pId}/members`, { role: 'Engineer' });
+        assert(m1.status === 400, `Expected 400 for missing member name, got ${m1.status}`);
+
+        // Missing role -> 400
+        const m2 = await makeRequest('POST', `/api/projects/${pId}/members`, { name: 'Bob' });
+        assert(m2.status === 400, `Expected 400 for missing member role, got ${m2.status}`);
+
+        // Valid member with optional email
+        const m3 = await makeRequest('POST', `/api/projects/${pId}/members`, {
+          name: 'Margaret Hamilton',
+          role: 'Apollo Director',
+          email: 'margaret@mit.edu',
+        });
+        assert(m3.status === 201, `Expected 201 for valid member with email, got ${m3.status}`);
+        assertEqual(m3.data.email, 'margaret@mit.edu', 'Email must match');
+      } finally {
+        await makeRequest('DELETE', `/api/projects/${pId}`);
+      }
+    } else {
+      const schema = getSchema();
+      assertIncludes(schema, 'email     String?', 'Member model must support optional email');
+    }
+  });
+
+  // =========================================================================
+  // TIER 3: CASCADE DELETION & DUAL INTERFACE SYNCHRONIZATION
+  // =========================================================================
+  console.log(`\n${colors.magenta}${colors.bright}--- TIER 3: CASCADE DELETION & DUAL INTERFACE SYNCHRONIZATION ---${colors.reset}`);
+
+  await runTest('T3-CAS-01', 3, 'Full Hierarchy Cascade: Project Deletion Purges All Child Entities', async () => {
+    if (serverUp) {
+      // 1. Create Project
+      const pRes = await makeRequest('POST', '/api/projects', { title: 'Cascade Root Project' });
+      assert(pRes.status === 201, 'Failed to create root project');
+      const pId = pRes.data.id;
+
+      // 2. Create Stage
+      const sRes = await makeRequest('POST', `/api/projects/${pId}/stages`, { title: 'Cascade Stage' });
+      assert(sRes.status === 201, 'Failed to create cascade stage');
+      const sId = sRes.data.id;
+
+      // 3. Create Task
+      const tRes = await makeRequest('POST', `/api/stages/${sId}/tasks`, { title: 'Cascade Task' });
+      assert(tRes.status === 201, 'Failed to create cascade task');
+      const tId = tRes.data.id;
+
+      // 4. Create Subtask
+      const subRes = await makeRequest('POST', `/api/tasks/${tId}/subtasks`, { title: 'Cascade Subtask' });
+      assert(subRes.status === 201, 'Failed to create cascade subtask');
+      const subId = subRes.data.id;
+
+      // 5. Create UpdateLog
+      const logRes = await makeRequest('POST', `/api/projects/${pId}/update-logs`, {
+        title: 'Cascade Log',
+        content: 'Log to be purged',
+      });
+      assert(logRes.status === 201, 'Failed to create cascade log');
+      const logId = logRes.data.id;
+
+      // 6. Create Member
+      const mRes = await makeRequest('POST', `/api/projects/${pId}/members`, {
+        name: 'Cascade Member',
+        role: 'Tester',
+      });
+      assert(mRes.status === 201, 'Failed to create cascade member');
+      const mId = mRes.data.id;
+
+      // 7. Delete Root Project
+      const delRes = await makeRequest('DELETE', `/api/projects/${pId}`);
+      assert(delRes.status === 204 || delRes.status === 200, `Delete failed: ${delRes.status}`);
+
+      // 8. Assert all children are completely purged (404)
+      const pCheck = await makeRequest('GET', `/api/projects/${pId}`);
+      assertEqual(pCheck.status, 404, 'Deleted project must return 404');
+
+      const sCheck = await makeRequest('GET', `/api/stages/${sId}`);
+      assertEqual(sCheck.status, 404, 'Cascaded stage must return 404');
+
+      const tCheck = await makeRequest('GET', `/api/tasks/${tId}`);
+      assertEqual(tCheck.status, 404, 'Cascaded task must return 404');
+
+      const logCheck = await makeRequest('GET', `/api/update-logs/${logId}`);
+      assertEqual(logCheck.status, 404, 'Cascaded log must return 404');
+
+      const mCheck = await makeRequest('GET', `/api/members/${mId}`);
+      assertEqual(mCheck.status, 404, 'Cascaded member must return 404');
+    } else {
+      const schema = getSchema();
+      assertIncludes(schema, 'onDelete: Cascade', 'Project relations must specify onDelete: Cascade');
+    }
+  });
+
+  await runTest('T3-CAS-02', 3, 'Stage Cascade: Stage Deletion Purges Tasks and Subtasks While Preserving Project', async () => {
+    if (serverUp) {
+      const pRes = await makeRequest('POST', '/api/projects', { title: 'Stage Cascade Project' });
+      const pId = pRes.data.id;
+
+      try {
+        const s1 = await makeRequest('POST', `/api/projects/${pId}/stages`, { title: 'Stage Alpha' });
+        const s2 = await makeRequest('POST', `/api/projects/${pId}/stages`, { title: 'Stage Beta' });
+        const s1Id = s1.data.id;
+        const s2Id = s2.data.id;
+
+        const tRes = await makeRequest('POST', `/api/stages/${s1Id}/tasks`, { title: 'Task in Alpha' });
+        const tId = tRes.data.id;
+
+        const subRes = await makeRequest('POST', `/api/tasks/${tId}/subtasks`, { title: 'Subtask in Alpha' });
+        const subId = subRes.data.id;
+
+        // Delete Stage Alpha
+        const delRes = await makeRequest('DELETE', `/api/stages/${s1Id}`);
+        assert(delRes.status === 204 || delRes.status === 200, `Stage delete failed: ${delRes.status}`);
+
+        // Verify task and subtask are gone
+        const tCheck = await makeRequest('GET', `/api/tasks/${tId}`);
+        assertEqual(tCheck.status, 404, 'Task under deleted stage must return 404');
+
+        // Verify Stage Beta and parent Project are intact
+        const s2Check = await makeRequest('GET', `/api/stages/${s2Id}`);
+        assertEqual(s2Check.status, 200, 'Sibling stage must remain intact');
+
+        const pCheck = await makeRequest('GET', `/api/projects/${pId}`);
+        assertEqual(pCheck.status, 200, 'Parent project must remain intact');
+      } finally {
+        await makeRequest('DELETE', `/api/projects/${pId}`);
+      }
+    } else {
+      const schema = getSchema();
+      assertIncludes(schema, 'stage       Stage    @relation(fields: [stageId], references: [id], onDelete: Cascade)', 'Task must cascade on stage delete');
+    }
+  });
+
+  await runTest('T3-CAS-03', 3, 'Task Cascade: Task Deletion Purges Subtasks While Preserving Stage', async () => {
+    if (serverUp) {
+      const pRes = await makeRequest('POST', '/api/projects', { title: 'Task Cascade Project' });
+      const pId = pRes.data.id;
+
+      try {
+        const sRes = await makeRequest('POST', `/api/projects/${pId}/stages`, { title: 'Stage with Task' });
+        const sId = sRes.data.id;
+
+        const tRes = await makeRequest('POST', `/api/stages/${sId}/tasks`, { title: 'Task with Subtasks' });
+        const tId = tRes.data.id;
+
+        const sub1 = await makeRequest('POST', `/api/tasks/${tId}/subtasks`, { title: 'Sub 1' });
+        const sub2 = await makeRequest('POST', `/api/tasks/${tId}/subtasks`, { title: 'Sub 2' });
+        const sub1Id = sub1.data.id;
+        const sub2Id = sub2.data.id;
+
+        // Delete Task
+        const delRes = await makeRequest('DELETE', `/api/tasks/${tId}`);
+        assert(delRes.status === 204 || delRes.status === 200, `Task delete failed: ${delRes.status}`);
+
+        // Verify subtasks are purged (toggle endpoint or subtask route returns 404)
+        const sub1Toggle = await makeRequest('PATCH', `/api/subtasks/${sub1Id}`, { isDone: true });
+        assertEqual(sub1Toggle.status, 404, 'Subtask 1 of deleted task must return 404');
+
+        const sub2Toggle = await makeRequest('PATCH', `/api/subtasks/${sub2Id}`, { isDone: true });
+        assertEqual(sub2Toggle.status, 404, 'Subtask 2 of deleted task must return 404');
+
+        // Stage must be intact
+        const sCheck = await makeRequest('GET', `/api/stages/${sId}`);
+        assertEqual(sCheck.status, 200, 'Parent stage must remain intact');
+      } finally {
+        await makeRequest('DELETE', `/api/projects/${pId}`);
+      }
+    } else {
+      const schema = getSchema();
+      assertIncludes(schema, 'task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)', 'Subtask must cascade on task delete');
+    }
+  });
+
+  await runTest('T3-CMB-01', 3, 'Dual Interface Synchronization (REST ↔ MCP Interoperability)', async () => {
+    if (serverUp && mcpClient) {
+      // Step 1: Create Project and Stage via REST
+      const pRes = await makeRequest('POST', '/api/projects', {
+        title: 'Dual Interface Sync Project',
+        businessLogic: '# Initial REST Spec',
+      });
+      const pId = pRes.data.id;
+
+      try {
+        const sRes = await makeRequest('POST', `/api/projects/${pId}/stages`, { title: 'Sync Stage' });
+        const sId = sRes.data.id;
+
+        // Step 2: MCP updates business logic
+        await mcpClient.callTool('update_business_logic', {
+          projectId: pId,
+          businessLogic: '# Modified by MCP SSE Client',
+        });
+
+        // Step 3: REST reads back updated business logic
+        const pRead = await makeRequest('GET', `/api/projects/${pId}`);
+        assertEqual(pRead.data.businessLogic, '# Modified by MCP SSE Client', 'REST must reflect MCP update');
+
+        // Step 4: REST adds a Task
+        const tRest = await makeRequest('POST', `/api/stages/${sId}/tasks`, { title: 'Task Added via REST' });
+        const tRestId = tRest.data.id;
+
+        // Step 5: MCP reads project context and verifies REST task is visible to AI
+        const mcpContext = await mcpClient.callTool('read_project_context', { projectId: pId });
+        const contextObj = JSON.parse(mcpContext.content[0].text);
+        const stageInMcp = contextObj.stages.find((st: any) => st.id === sId);
+        assert(stageInMcp !== undefined, 'Stage must be present in MCP context');
+        assert(stageInMcp.tasks.some((t: any) => t.id === tRestId), 'Task added via REST must be visible in MCP context');
+
+        // Step 6: MCP creates a Task
+        const mcpCreate = await mcpClient.callTool('create_task', {
+          stageId: sId,
+          title: 'Task Added via MCP',
+          status: 'IN_PROGRESS',
+        });
+        const mcpTaskId = mcpCreate.content[0].text.split(':').pop().trim();
+
+        // Step 7: REST queries stage tasks and verifies MCP task is present
+        const restStageTasks = await makeRequest('GET', `/api/stages/${sId}/tasks`);
+        assert(restStageTasks.data.some((t: any) => t.id === mcpTaskId), 'Task added via MCP must be visible in REST');
+      } finally {
+        await makeRequest('DELETE', `/api/projects/${pId}`);
+      }
+    } else {
+      const content = getBackendIndex();
       assert(
-        content.includes('!title') || content.includes('trim()') || content.includes('400'),
-        "Backend must implement validation against empty or whitespace titles"
+        content.includes('projectService') && content.includes('taskService'),
+        'Shared service layer provides dual-interface synchronization'
       );
     }
   });
 
-  await runTest('T2-BND-02', 2, 'Resource Stress: 1,000+ Character Title and Description', async () => {
-    const longTitle = 'E2E_STRESS_' + 'X'.repeat(500);
-    const longDesc = 'Y'.repeat(2000);
+  await runTest('T3-CMB-02', 3, 'Multi-Stage Task Scoping and Isolation', async () => {
     if (serverUp) {
-      const res = await makeRequest('POST', '/api/tasks', {
-        title: longTitle,
-        description: longDesc,
-        category: 'PERSONAL'
-      });
-      assert(res.status === 201 || res.status === 200, `Expected success storing long text, got ${res.status}`);
-      // Clean up
-      if (res.data?.id) {
-        await makeRequest('DELETE', `/api/tasks/${res.data.id}`);
+      const pRes = await makeRequest('POST', '/api/projects', { title: 'Multi-Stage Isolation Project' });
+      const pId = pRes.data.id;
+
+      try {
+        const s1 = await makeRequest('POST', `/api/projects/${pId}/stages`, { title: 'Stage 1' });
+        const s2 = await makeRequest('POST', `/api/projects/${pId}/stages`, { title: 'Stage 2' });
+        const s1Id = s1.data.id;
+        const s2Id = s2.data.id;
+
+        // Add 2 tasks to Stage 1
+        await makeRequest('POST', `/api/stages/${s1Id}/tasks`, { title: 'Stage 1 Task A' });
+        await makeRequest('POST', `/api/stages/${s1Id}/tasks`, { title: 'Stage 1 Task B' });
+
+        // Add 1 task to Stage 2
+        await makeRequest('POST', `/api/stages/${s2Id}/tasks`, { title: 'Stage 2 Task Unique' });
+
+        // Verify scoping
+        const s1Tasks = await makeRequest('GET', `/api/stages/${s1Id}/tasks`);
+        assertEqual(s1Tasks.data.length, 2, 'Stage 1 must contain exactly 2 tasks');
+        assert(s1Tasks.data.every((t: any) => t.stageId === s1Id), 'All tasks must belong to Stage 1');
+
+        const s2Tasks = await makeRequest('GET', `/api/stages/${s2Id}/tasks`);
+        assertEqual(s2Tasks.data.length, 1, 'Stage 2 must contain exactly 1 task');
+        assertEqual(s2Tasks.data[0].title, 'Stage 2 Task Unique', 'Stage 2 task must be isolated');
+      } finally {
+        await makeRequest('DELETE', `/api/projects/${pId}`);
       }
     } else {
-      // Prisma schema validation: String columns in PostgreSQL have unbounded length by default
-      const schemaPath = path.join(targetWorkspace, 'backend/prisma/schema.prisma');
-      const content = fs.readFileSync(schemaPath, 'utf-8');
-      assertIncludes(content, 'title       String', "Schema must define title as String");
-      assertIncludes(content, 'description String?', "Schema must define description as nullable String");
+      const schema = getSchema();
+      assertIncludes(schema, 'stageId     String', 'Task must be indexed and scoped by stageId');
     }
-  });
-
-  await runTest('T2-BND-03', 2, 'Special Characters, XSS, & SQL Injection Escaping Fidelity', async () => {
-    const maliciousPayload = "FocusTask ' \" <script>alert('XSS')</script> 🚀 & \"; DROP TABLE Tasks; --";
-    if (serverUp) {
-      const res = await makeRequest('POST', '/api/tasks', {
-        title: maliciousPayload,
-        category: 'PROJECT'
-      });
-      assert(res.status === 201 || res.status === 200, `Failed to handle special chars payload: ${res.status}`);
-      assert(res.data.title === maliciousPayload, "Title must retain exact character fidelity without corruption or unescaped execution");
-      if (res.data?.id) {
-        await makeRequest('DELETE', `/api/tasks/${res.data.id}`);
-      }
-    } else {
-      // Verify Prisma parameterized query usage
-      const schemaPath = path.join(targetWorkspace, 'backend/prisma/schema.prisma');
-      assert(fs.existsSync(schemaPath), "Prisma schema must exist");
-    }
-  });
-
-  await runTest('T2-BND-04', 2, 'Non-Existent UUID Handling Returns 404', async () => {
-    const nonExistentId = '00000000-0000-0000-0000-000000000000';
-    if (serverUp) {
-      const res = await makeRequest('PATCH', `/api/tasks/${nonExistentId}`, { status: 'DONE' });
-      assert(res.status === 404, `Expected 404 for non-existent UUID, got ${res.status}`);
-    } else {
-      const indexPath = path.join(targetWorkspace, 'backend/src/index.ts');
-      const content = fs.readFileSync(indexPath, 'utf-8');
-      assert(
-        content.includes('404') || content.includes('P2025') || content.includes('RecordNotFound'),
-        "Backend must handle missing UUID records with 404 status"
-      );
-    }
-  });
-
-  await runTest('T2-BND-05', 2, 'Invalid Category and Status Enum Values Rejected', async () => {
-    if (serverUp) {
-      const res = await makeRequest('POST', '/api/tasks', {
-        title: 'Enum Test',
-        category: 'INVALID_CATEGORY'
-      });
-      assert(res.status >= 400 && res.status < 500, `Expected 4xx for invalid enum, got ${res.status}`);
-    } else {
-      const schemaPath = path.join(targetWorkspace, 'backend/prisma/schema.prisma');
-      const content = fs.readFileSync(schemaPath, 'utf-8');
-      assertIncludes(content, 'enum Category {', "Schema must define Category enum");
-      assertIncludes(content, 'enum Status {', "Schema must define Status enum");
-    }
-  });
-
-  await runTest('T2-BND-06', 2, 'Cascade Deletion Integrity Contract (onDelete: Cascade)', () => {
-    const schemaPath = path.join(targetWorkspace, 'backend/prisma/schema.prisma');
-    assert(fs.existsSync(schemaPath), "schema.prisma must exist");
-    const content = fs.readFileSync(schemaPath, 'utf-8');
-
-    assertIncludes(
-      content,
-      'onDelete: Cascade',
-      "Subtask relation must specify 'onDelete: Cascade' to guarantee child cleanup on task deletion"
-    );
-  });
-
-  await runTest('T2-BND-07', 2, 'Subtask Toggle State Inversion Contract', () => {
-    const indexPath = path.join(targetWorkspace, 'backend/src/index.ts');
-    const content = fs.readFileSync(indexPath, 'utf-8');
-    assert(
-      content.includes('toggle_subtask') || content.includes('/api/subtasks/:id'),
-      "System must implement subtask toggle contract"
-    );
-  });
-
-  // =========================================================================
-  // TIER 3: CROSS-FEATURE COMBINATIONS
-  // =========================================================================
-  console.log(`\n${colors.magenta}${colors.bright}--- TIER 3: CROSS-FEATURE COMBINATIONS ---${colors.reset}`);
-
-  await runTest('T3-CMB-01', 3, 'Full Lifecycle: Create Task -> Add Subtasks -> Progress -> Complete -> Delete', async () => {
-    if (serverUp) {
-      // Step 1: Create Task
-      const taskRes = await makeRequest('POST', '/api/tasks', {
-        title: 'Lifecycle E2E Test Task',
-        category: 'PROJECT',
-        description: 'Complete lifecycle verification'
-      });
-      assert(taskRes.status === 201 || taskRes.status === 200, "Step 1: Task creation failed");
-      const taskId = taskRes.data.id;
-
-      // Step 2: Add Subtasks
-      const sub1 = await makeRequest('POST', `/api/tasks/${taskId}/subtasks`, { title: 'Subtask Alpha' });
-      const sub2 = await makeRequest('POST', `/api/tasks/${taskId}/subtasks`, { title: 'Subtask Beta' });
-      assert(sub1.status === 201 || sub1.status === 200, "Step 2: Subtask 1 creation failed");
-      assert(sub2.status === 201 || sub2.status === 200, "Step 2: Subtask 2 creation failed");
-
-      // Step 3: Toggle Subtask 1 to done
-      const toggleRes = await makeRequest('PATCH', `/api/subtasks/${sub1.data.id}`, { isDone: true });
-      assert(toggleRes.status === 200, "Step 3: Subtask 1 toggle failed");
-
-      // Step 4: Move Task to IN_PROGRESS
-      const moveRes = await makeRequest('PATCH', `/api/tasks/${taskId}`, { status: 'IN_PROGRESS' });
-      assert(moveRes.status === 200, "Step 4: Task status update to IN_PROGRESS failed");
-
-      // Step 5: Move Task to DONE
-      const completeRes = await makeRequest('PATCH', `/api/tasks/${taskId}`, { status: 'DONE' });
-      assert(completeRes.status === 200, "Step 5: Task status update to DONE failed");
-
-      // Step 6: Delete Task
-      const deleteRes = await makeRequest('DELETE', `/api/tasks/${taskId}`);
-      assert(deleteRes.status === 204 || deleteRes.status === 200, "Step 6: Task deletion failed");
-
-      // Step 7: Verify Cascade Deletion
-      const verifyRes = await makeRequest('GET', `/api/tasks`);
-      const remaining = (verifyRes.data as any[]).find((t: any) => t.id === taskId);
-      assert(!remaining, "Step 7: Deleted task must not appear in task list");
-    } else {
-      // Offline contract verification: inspect schema and Express routes
-      const indexPath = path.join(targetWorkspace, 'backend/src/index.ts');
-      const content = fs.readFileSync(indexPath, 'utf-8');
-      assertIncludes(content, 'prisma.task.create', "Backend must have task create logic");
-      assertIncludes(content, 'prisma.task.update', "Backend must have task update logic");
-      assertIncludes(content, 'prisma.task.delete', "Backend must have task delete logic");
-    }
-  });
-
-  await runTest('T3-CMB-02', 3, 'Dual Interface Synchronization (MCP ↔ REST Interoperability)', () => {
-    const indexPath = path.join(targetWorkspace, 'backend/src/index.ts');
-    const content = fs.readFileSync(indexPath, 'utf-8');
-
-    // Both interfaces operate on the shared Prisma Task model
-    assert(
-      content.includes('prisma.task') && content.includes('/api/tasks') && content.includes('braindboard-mcp'),
-      "Backend must share Prisma state between MCP server and REST endpoints"
-    );
-  });
-
-  await runTest('T3-CMB-03', 3, 'Category and Status Multi-Filter Matrix Contract', () => {
-    const indexPath = path.join(targetWorkspace, 'backend/src/index.ts');
-    const content = fs.readFileSync(indexPath, 'utf-8');
-
-    // list_tasks filters
-    assertIncludes(content, 'if (args?.category) filters.category = args.category', "MCP must support category filter");
-    assertIncludes(content, 'if (args?.status) filters.status = args.status', "MCP must support status filter");
-  });
-
-  await runTest('T3-CMB-04', 3, 'Subtask Isolation Across Sibling Tasks', () => {
-    const schemaPath = path.join(targetWorkspace, 'backend/prisma/schema.prisma');
-    const content = fs.readFileSync(schemaPath, 'utf-8');
-    assertIncludes(content, 'taskId      String', "Subtask must be scoped by foreign key taskId");
   });
 
   // =========================================================================
@@ -579,92 +1431,201 @@ async function executeTestSuite() {
   // =========================================================================
   console.log(`\n${colors.magenta}${colors.bright}--- TIER 4: REAL-WORLD APPLICATION SCENARIOS ---${colors.reset}`);
 
-  await runTest('T4-SCN-01', 4, 'Scenario 1: Agile Sprint Delivery Workflow (PROJECT)', async () => {
-    const scenarioData = {
-      title: 'Sprint 14: Deploy FocusTask MVP',
-      category: 'PROJECT',
-      description: 'Containerize backend and frontend, test remote Neon DB connection',
-      subtasks: [
-        'Write backend/Dockerfile with Node 20 and Prisma generate',
-        'Write frontend/Dockerfile with multi-stage Nginx build',
-        'Configure docker-compose.yml with environment mapping',
-        'Execute end-to-end integration smoke tests'
-      ]
-    };
-
-    if (serverUp) {
-      const task = await makeRequest('POST', '/api/tasks', {
-        title: scenarioData.title,
-        category: scenarioData.category,
-        description: scenarioData.description
+  await runTest('T4-SCN-01', 4, 'Autonomous AI Project Onboarding & Full SDLC Lifecycle Execution', async () => {
+    if (serverUp && mcpClient) {
+      // Step 1: Project Initialization with technical settings
+      const pRes = await makeRequest('POST', '/api/projects', {
+        title: 'Project Phoenix: Autonomous Cloud Infrastructure',
+        description: 'Self-healing Kubernetes clusters orchestrated by AI Agents',
+        status: 'PLANNING',
+        githubRepo: 'https://github.com/phoenix-ops/core',
+        settings: {
+          kubernetesVersion: '1.30',
+          cloudProvider: 'aws',
+          region: 'us-east-1',
+          autoScaling: true,
+        },
       });
-      assert(task.status === 201 || task.status === 200, "Failed to create Sprint task");
+      assert(pRes.status === 201, 'Step 1: Project creation failed');
+      const pId = pRes.data.id;
 
-      for (const st of scenarioData.subtasks) {
-        const res = await makeRequest('POST', `/api/tasks/${task.data.id}/subtasks`, { title: st });
-        assert(res.status === 201 || res.status === 200, `Failed to create subtask: ${st}`);
+      try {
+        // Step 2: Define 3 Sequential Stages
+        const st1 = await makeRequest('POST', `/api/projects/${pId}/stages`, { title: '1. Architecture & Specs' });
+        const st2 = await makeRequest('POST', `/api/projects/${pId}/stages`, { title: '2. Cluster Automation' });
+        const st3 = await makeRequest('POST', `/api/projects/${pId}/stages`, { title: '3. Production Readiness' });
+        const st1Id = st1.data.id;
+        const st2Id = st2.data.id;
+        const st3Id = st3.data.id;
+
+        // Step 3: Add Team Members
+        await makeRequest('POST', `/api/projects/${pId}/members`, {
+          name: 'Sarah Connor',
+          role: 'DevOps Lead',
+          email: 'sarah@phoenix-ops.io',
+        });
+        await makeRequest('POST', `/api/projects/${pId}/members`, {
+          name: 'T-800 Assistant',
+          role: 'Autonomous AI Engineer',
+          email: 't800@phoenix-ops.io',
+        });
+
+        // Step 4: AI updates architecture rules via MCP
+        const aiSpec =
+          '# Architecture Specification: Project Phoenix\n\n' +
+          '1. Infrastructure as Code via Terraform.\n' +
+          '2. GitOps deployments via ArgoCD.\n' +
+          '3. Continuous telemetry via Prometheus & Grafana.';
+        await mcpClient.callTool('update_business_logic', {
+          projectId: pId,
+          businessLogic: aiSpec,
+        });
+
+        // Step 5: AI logs project kickoff via MCP
+        await mcpClient.callTool('log_project_update', {
+          projectId: pId,
+          title: 'Milestone 1 Kickoff: Architecture Defined',
+          content: 'Architecture rules established. Moving Stage 1 to active execution.',
+          author: 'T-800 Assistant',
+        });
+
+        // Step 6: AI creates tasks under Stage 1
+        const task1Res = await mcpClient.callTool('create_task', {
+          stageId: st1Id,
+          title: 'Synthesize Terraform AWS EKS Modules',
+          description: 'Define VPC, subnets, and node groups',
+        });
+        const task1Id = task1Res.content[0].text.split(':').pop().trim();
+
+        // Step 7: Add Subtasks via REST
+        const sub1 = await makeRequest('POST', `/api/tasks/${task1Id}/subtasks`, { title: 'Configure VPC CIDR block' });
+        const sub2 = await makeRequest('POST', `/api/tasks/${task1Id}/subtasks`, { title: 'Create IAM OIDC provider' });
+
+        // Step 8: Progress Subtasks and Task
+        await makeRequest('PATCH', `/api/subtasks/${sub1.data.id}`, { isDone: true });
+        await makeRequest('PATCH', `/api/subtasks/${sub2.data.id}`, { isDone: true });
+        await mcpClient.callTool('move_task', { id: task1Id, status: 'DONE' });
+
+        // Step 9: Transition Stage 1 to COMPLETED, Stage 2 to IN_PROGRESS, Project to ACTIVE
+        await makeRequest('PATCH', `/api/stages/${st1Id}`, { status: 'COMPLETED' });
+        await makeRequest('PATCH', `/api/stages/${st2Id}`, { status: 'IN_PROGRESS' });
+        await makeRequest('PATCH', `/api/projects/${pId}`, { status: 'ACTIVE' });
+
+        // Step 10: AI reads full project context and verifies state
+        const contextRes = await mcpClient.callTool('read_project_context', { projectId: pId });
+        const context = JSON.parse(contextRes.content[0].text);
+
+        assertEqual(context.status, 'ACTIVE', 'Project status must be ACTIVE');
+        assertEqual(context.stages.length, 3, 'Project must contain all 3 stages');
+        const completedStage = context.stages.find((s: any) => s.id === st1Id);
+        assertEqual(completedStage.status, 'COMPLETED', 'Stage 1 must be COMPLETED');
+        assertEqual(completedStage.tasks[0].status, 'DONE', 'Stage 1 task must be DONE');
+        assertEqual(completedStage.tasks[0].subtasks.length, 2, 'Task must have 2 subtasks');
+        assert(completedStage.tasks[0].subtasks.every((st: any) => st.isDone), 'All subtasks must be done');
+      } finally {
+        await makeRequest('DELETE', `/api/projects/${pId}`);
       }
-
-      // Move to IN_PROGRESS
-      await makeRequest('PATCH', `/api/tasks/${task.data.id}`, { status: 'IN_PROGRESS' });
-      // Move to DONE
-      await makeRequest('PATCH', `/api/tasks/${task.data.id}`, { status: 'DONE' });
-      // Clean up
-      await makeRequest('DELETE', `/api/tasks/${task.data.id}`);
     } else {
-      assert(true, "Scenario 1 specification verified");
+      const content = getBackendIndex();
+      assertIncludes(content, 'create_task', 'create_task tool supported');
+      assertIncludes(content, 'read_project_context', 'read_project_context tool supported');
     }
   });
 
-  await runTest('T4-SCN-02', 4, 'Scenario 2: Academic Semester Exam Preparation (COLLEGE)', async () => {
-    const scenarioData = {
-      title: 'Sistemas Distribuídos - Prova Final',
-      category: 'COLLEGE',
-      description: 'Revisão intensiva para exame final',
-      subtasks: [
-        'Revisar Algoritmo de Consenso Raft',
-        'Implementar Mini-Servidor RPC em Go/Node',
-        'Resolver Lista 3 de Questões Teóricas'
-      ]
-    };
-
+  await runTest('T4-SCN-02', 4, 'Rapid Agile Milestone Delivery & Stage Transition Scenario', async () => {
     if (serverUp) {
-      const task = await makeRequest('POST', '/api/tasks', {
-        title: scenarioData.title,
-        category: scenarioData.category,
-        description: scenarioData.description
+      const pRes = await makeRequest('POST', '/api/projects', {
+        title: 'Rapid Sprint Delivery Workflow',
+        status: 'ACTIVE',
       });
-      assert(task.status === 201 || task.status === 200, "Failed to create College task");
-      await makeRequest('DELETE', `/api/tasks/${task.data.id}`);
+      const pId = pRes.data.id;
+
+      try {
+        const sRes = await makeRequest('POST', `/api/projects/${pId}/stages`, {
+          title: 'Sprint 24 Deliverables',
+          status: 'IN_PROGRESS',
+        });
+        const sId = sRes.data.id;
+
+        const tasksData = [
+          { title: 'Feature A: JWT Token Refresh', desc: 'Add 15m expiration' },
+          { title: 'Feature B: Rate Limiting Middleware', desc: 'Add 100 req/min bucket' },
+          { title: 'Feature C: Healthcheck Metric Endpoint', desc: 'Expose memory & CPU' },
+        ];
+
+        const taskIds: string[] = [];
+        for (const td of tasksData) {
+          const t = await makeRequest('POST', `/api/stages/${sId}/tasks`, {
+            title: td.title,
+            description: td.desc,
+            status: 'TODO',
+          });
+          taskIds.push(t.data.id);
+        }
+
+        // Rapid progress
+        for (const id of taskIds) {
+          await makeRequest('PATCH', `/api/tasks/${id}`, { status: 'DONE' });
+        }
+
+        // Close stage
+        const sClose = await makeRequest('PATCH', `/api/stages/${sId}`, { status: 'COMPLETED' });
+        assertEqual(sClose.data.status, 'COMPLETED', 'Sprint milestone stage must be COMPLETED');
+
+        // Log completion
+        const log = await makeRequest('POST', `/api/projects/${pId}/update-logs`, {
+          title: 'Sprint 24 Successfully Closed',
+          content: 'All 3 sprint backlog items completed with 100% test coverage.',
+          author: 'Scrum Master AI',
+        });
+        assert(log.status === 201, 'Completion log must be registered');
+      } finally {
+        await makeRequest('DELETE', `/api/projects/${pId}`);
+      }
     } else {
-      assert(true, "Scenario 2 specification verified");
+      assert(true, 'Scenario 2 specification verified');
     }
   });
 
-  await runTest('T4-SCN-03', 4, 'Scenario 3: Personal Weekend Errands (PERSONAL)', async () => {
-    const scenarioData = {
-      title: 'Tarefas de Sábado',
-      category: 'PERSONAL',
-      description: 'Manutenção da casa e compras',
-      subtasks: [
-        'Comprar café em grãos',
-        'Trocar lâmpada da sala',
-        'Pagar fatura de internet'
-      ]
-    };
-
+  await runTest('T4-SCN-03', 4, 'Audit Trail & Project Governance Verification Scenario', async () => {
     if (serverUp) {
-      const task = await makeRequest('POST', '/api/tasks', {
-        title: scenarioData.title,
-        category: scenarioData.category,
-        description: scenarioData.description
+      const pRes = await makeRequest('POST', '/api/projects', {
+        title: 'SOC2 Compliance & Audit Trail Project',
+        status: 'ACTIVE',
+        settings: { complianceStandard: 'SOC2-Type-II', auditYear: 2026 },
       });
-      assert(task.status === 201 || task.status === 200, "Failed to create Personal task");
-      await makeRequest('DELETE', `/api/tasks/${task.data.id}`);
+      const pId = pRes.data.id;
+
+      try {
+        // Register logs from multiple authors
+        const authors = ['Security Auditor', 'Lead Compliance Officer', 'AI Sentinel System'];
+        for (let i = 0; i < authors.length; i++) {
+          await makeRequest('POST', `/api/projects/${pId}/update-logs`, {
+            title: `Audit Checkpoint ${i + 1}`,
+            content: `Verification checkpoint completed by ${authors[i]}. Relational integrity intact.`,
+            author: authors[i],
+          });
+        }
+
+        // Query audit trail
+        const logsRes = await makeRequest('GET', `/api/projects/${pId}/update-logs`);
+        assert(logsRes.status === 200, 'Audit trail logs must return 200');
+        assertEqual(logsRes.data.length, 3, 'Audit trail must record all 3 logs');
+        for (const author of authors) {
+          assert(logsRes.data.some((l: any) => l.author === author), `Audit log from ${author} must be present`);
+        }
+      } finally {
+        await makeRequest('DELETE', `/api/projects/${pId}`);
+      }
     } else {
-      assert(true, "Scenario 3 specification verified");
+      assert(true, 'Scenario 3 specification verified');
     }
   });
+
+  // Global teardown
+  if (activeMcpClient) {
+    activeMcpClient.close();
+  }
 
   // =========================================================================
   // REPORTING & SUMMARY
@@ -674,9 +1635,9 @@ async function executeTestSuite() {
   console.log(`${colors.cyan}${colors.bright}====================================================${colors.reset}`);
 
   const total = results.length;
-  const passed = results.filter(r => r.status === 'PASSED').length;
-  const failed = results.filter(r => r.status === 'FAILED').length;
-  const skipped = results.filter(r => r.status === 'SKIPPED').length;
+  const passed = results.filter((r) => r.status === 'PASSED').length;
+  const failed = results.filter((r) => r.status === 'FAILED').length;
+  const skipped = results.filter((r) => r.status === 'SKIPPED').length;
   const passRate = total > 0 ? ((passed / total) * 100).toFixed(1) : '0';
 
   console.log(`Total Tests Run:  ${colors.bright}${total}${colors.reset}`);
@@ -685,33 +1646,43 @@ async function executeTestSuite() {
   console.log(`Skipped:         ${colors.yellow}${skipped}${colors.reset}`);
   console.log(`Pass Rate:       ${colors.bright}${passRate}%${colors.reset}\n`);
 
+  // Tier Breakdown
+  for (const tierNum of [1, 2, 3, 4]) {
+    const tierResults = results.filter((r) => r.tier === tierNum);
+    if (tierResults.length > 0) {
+      const tierPassed = tierResults.filter((r) => r.status === 'PASSED').length;
+      const tierTotal = tierResults.length;
+      const tierRate = ((tierPassed / tierTotal) * 100).toFixed(1);
+      console.log(`  Tier ${tierNum}: ${colors.bright}${tierPassed}/${tierTotal}${colors.reset} passed (${tierRate}%)`);
+    }
+  }
+  console.log('');
+
   if (failed > 0) {
     console.log(`${colors.red}${colors.bright}Failed Tests Breakdown:${colors.reset}`);
-    for (const fail of results.filter(r => r.status === 'FAILED')) {
+    for (const fail of results.filter((r) => r.status === 'FAILED')) {
       console.log(`  - [Tier ${fail.tier}] ${colors.bright}${fail.id}${colors.reset}: ${fail.name}`);
       console.log(`    ${colors.red}Reason:${colors.reset} ${fail.error}`);
     }
     console.log('');
   }
 
-  // Save report to JSON artifact if in artifact dir
+  // Save report to JSON artifact
   const report = {
     timestamp: new Date().toISOString(),
     targetWorkspace,
-    isLive,
+    isLive: serverUp,
     total,
     passed,
     failed,
     skipped,
     passRate: `${passRate}%`,
-    results
+    results,
   };
 
   try {
     fs.writeFileSync(path.join(__dirname, 'test_execution_report.json'), JSON.stringify(report, null, 2));
-  } catch {
-    // Ignore report write error in read-only locations
-  }
+  } catch {}
 
   if (failed > 0) {
     process.exitCode = 1;

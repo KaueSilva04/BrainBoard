@@ -1,255 +1,274 @@
 {
-  "version": "1.0.0",
-  "project": "FocusTask Personal Kanban",
+  "version": "2.0.0",
+  "project": "BrainBoard V2 - Autonomous Project & Milestone Management with AI MCP",
   "authoritativeSources": [
     "ORIGINAL_REQUEST.md",
-    "PROJECT.md",
-    "estrutura_projeto.md",
-    "proposta_sistema_tarefas.md"
+    "backend/prisma/schema.prisma",
+    "backend/src/index.ts",
+    ".agents/explorer_v2_tests_1/handoff.md",
+    ".agents/worker_v2_backend_1/handoff.md"
   ],
   "testSuites": [
     {
       "tier": 1,
       "tierName": "Feature Coverage",
-      "description": "Comprehensive individual feature verification covering Backend MCP, Backend REST, Frontend UI contracts, and Docker containerization.",
+      "description": "Comprehensive individual feature verification covering REST CRUD for Projects, Stages, UpdateLogs, Members, Tasks (under Stages), Subtasks, real MCP SSE transport and tool execution, and Docker configurations.",
       "domains": [
         {
-          "domain": "BACKEND_MCP",
-          "features": [6, 7, 8, 9, 10, 11, 12],
+          "domain": "REST_PROJECT",
+          "description": "Project model operations including title, description, businessLogic, githubRepo, and settings JSON.",
+          "tests": [
+            {
+              "id": "T1-PRJ-01",
+              "name": "REST POST /api/projects - Project Creation with Metadata and Settings",
+              "description": "Verify POST /api/projects creates a project with title, description, businessLogic, githubRepo, settings JSON, and default status PLANNING.",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R1/R2 & Follow-up 2026-09-12T17:50:32Z",
+              "method": "POST",
+              "path": "/api/projects",
+              "expectedStatus": 201
+            },
+            {
+              "id": "T1-PRJ-02",
+              "name": "REST GET /api/projects and GET /api/projects/:id - Listing and Full Hierarchy",
+              "description": "Verify GET /api/projects lists projects and GET /api/projects/:id returns full nested relations (stages, tasks, subtasks, updateLogs, members).",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R2 & worker_v2_backend_1/handoff.md",
+              "method": "GET",
+              "path": "/api/projects",
+              "expectedStatus": 200
+            },
+            {
+              "id": "T1-PRJ-03",
+              "name": "REST PATCH /api/projects/:id - Status Transition and Field Updates",
+              "description": "Verify PATCH /api/projects/:id updates status to ACTIVE or COMPLETED, and updates githubRepo and settings.",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R2",
+              "method": "PATCH",
+              "path": "/api/projects/:id",
+              "expectedStatus": 200
+            },
+            {
+              "id": "T1-PRJ-04",
+              "name": "REST PATCH /api/projects/:id/business-logic - Dedicated Business Logic Route",
+              "description": "Verify PATCH /api/projects/:id/business-logic updates markdown business logic specifications.",
+              "authoritativeSource": "backend/src/index.ts & worker_v2_backend_1/handoff.md",
+              "method": "PATCH",
+              "path": "/api/projects/:id/business-logic",
+              "expectedStatus": 200
+            },
+            {
+              "id": "T1-PRJ-05",
+              "name": "REST PATCH /api/projects/:id/settings - Dedicated Settings Route",
+              "description": "Verify PATCH /api/projects/:id/settings updates githubRepo and settings JSON dynamically.",
+              "authoritativeSource": "backend/src/index.ts & Follow-up 2026-09-12T17:50:32Z",
+              "method": "PATCH",
+              "path": "/api/projects/:id/settings",
+              "expectedStatus": 200
+            }
+          ]
+        },
+        {
+          "domain": "REST_STAGE",
+          "description": "Stage (Milestone) operations belonging to Projects.",
+          "tests": [
+            {
+              "id": "T1-STG-01",
+              "name": "REST POST /api/projects/:projectId/stages - Stage Creation with Auto-Order",
+              "description": "Verify POST /api/projects/:projectId/stages creates a stage with title, auto-calculated incrementing order, and PLANNING status.",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R1/R2",
+              "method": "POST",
+              "path": "/api/projects/:projectId/stages",
+              "expectedStatus": 201
+            },
+            {
+              "id": "T1-STG-02",
+              "name": "REST GET /api/projects/:projectId/stages & PATCH /api/stages/:id - Listing and Status Update",
+              "description": "Verify stages can be listed by project and updated to IN_PROGRESS or COMPLETED.",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R2",
+              "method": "PATCH",
+              "path": "/api/stages/:id",
+              "expectedStatus": 200
+            }
+          ]
+        },
+        {
+          "domain": "REST_LOG",
+          "description": "UpdateLog (Diário de Bordo) operations with rich Markdown.",
+          "tests": [
+            {
+              "id": "T1-LOG-01",
+              "name": "REST POST /api/projects/:projectId/update-logs - Rich Markdown Log Creation",
+              "description": "Verify POST /api/projects/:projectId/update-logs creates a log with title, markdown content, and author.",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R1/R2 & R3",
+              "method": "POST",
+              "path": "/api/projects/:projectId/update-logs",
+              "expectedStatus": 201
+            },
+            {
+              "id": "T1-LOG-02",
+              "name": "REST GET /api/projects/:projectId/update-logs & GET /api/update-logs/:id - Listing",
+              "description": "Verify update logs are listed in descending chronological order.",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R2",
+              "method": "GET",
+              "path": "/api/projects/:projectId/update-logs",
+              "expectedStatus": 200
+            }
+          ]
+        },
+        {
+          "domain": "REST_MEMBER",
+          "description": "Project team members with name, role, and optional email.",
+          "tests": [
+            {
+              "id": "T1-MBR-01",
+              "name": "REST POST /api/projects/:projectId/members - Member Creation with Email and Role",
+              "description": "Verify POST /api/projects/:projectId/members creates a member record with name, email, and role.",
+              "authoritativeSource": "Follow-up 2026-09-12T17:50:32Z",
+              "method": "POST",
+              "path": "/api/projects/:projectId/members",
+              "expectedStatus": 201
+            },
+            {
+              "id": "T1-MBR-02",
+              "name": "REST GET /api/projects/:projectId/members & PATCH /api/members/:id - Listing and Role Update",
+              "description": "Verify team members can be listed and updated.",
+              "authoritativeSource": "Follow-up 2026-09-12T17:50:32Z",
+              "method": "GET",
+              "path": "/api/projects/:projectId/members",
+              "expectedStatus": 200
+            }
+          ]
+        },
+        {
+          "domain": "REST_TASK",
+          "description": "Tasks scoped to Stages (Milestones).",
+          "tests": [
+            {
+              "id": "T1-TSK-01",
+              "name": "REST POST /api/stages/:stageId/tasks - Task Creation Scoped to Stage",
+              "description": "Verify task creation requires stageId, defaults to TODO status, and eliminates legacy Category enum.",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R1/R2",
+              "method": "POST",
+              "path": "/api/stages/:stageId/tasks",
+              "expectedStatus": 201
+            },
+            {
+              "id": "T1-TSK-02",
+              "name": "REST GET /api/stages/:stageId/tasks & PATCH /api/tasks/:id - Progress Workflow",
+              "description": "Verify tasks are filtered by stageId and progress through TODO -> IN_PROGRESS -> DONE.",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R2",
+              "method": "PATCH",
+              "path": "/api/tasks/:id",
+              "expectedStatus": 200
+            }
+          ]
+        },
+        {
+          "domain": "REST_SUBTASK",
+          "description": "Subtask checklist items belonging to tasks.",
+          "tests": [
+            {
+              "id": "T1-SUB-01",
+              "name": "REST POST /api/tasks/:id/subtasks - Subtask Creation",
+              "description": "Verify subtask is created under parent taskId with default isDone false.",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R1",
+              "method": "POST",
+              "path": "/api/tasks/:id/subtasks",
+              "expectedStatus": 201
+            },
+            {
+              "id": "T1-SUB-02",
+              "name": "REST PATCH /api/subtasks/:id - Subtask Toggle",
+              "description": "Verify subtask isDone flag can be toggled.",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R1",
+              "method": "PATCH",
+              "path": "/api/subtasks/:id",
+              "expectedStatus": 200
+            }
+          ]
+        },
+        {
+          "domain": "MCP_SSE",
+          "description": "Real Model Context Protocol (MCP) Server-Sent Events (SSE) Transport & Tool Execution.",
           "tests": [
             {
               "id": "T1-MCP-01",
-              "name": "MCP Server Tool Registry Verification",
-              "featureId": 6,
-              "description": "Verify MCP server exposes all 5 required tools: list_tasks, create_task, move_task, add_subtask, toggle_subtask with correct JSON schemas.",
-              "authoritativeSource": "PROJECT.md § Interface Contracts #1 & ORIGINAL_REQUEST R1",
-              "expectedTools": ["list_tasks", "create_task", "move_task", "add_subtask", "toggle_subtask"]
+              "name": "MCP Real SSE Connection & Session Handshake",
+              "description": "Connects to GET /mcp/sse, receives endpoint event, parses sessionId and client POST message path.",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R3 & explorer_v2_tests_1/handoff.md § 1.3",
+              "transport": "SSE",
+              "expectedEvent": "endpoint"
             },
             {
               "id": "T1-MCP-02",
-              "name": "MCP list_tasks with Filters",
-              "featureId": 8,
-              "description": "Verify list_tasks returns task array including subtasks, respecting category and status filters.",
-              "authoritativeSource": "PROJECT.md Feature 8 & backend/src/index.ts",
-              "input": { "category": "PROJECT", "status": "TODO" },
-              "expectedOutput": { "format": "json_array", "subtasksIncluded": true }
+              "name": "MCP tools/list Schema Discovery",
+              "description": "Invokes tools/list over JSON-RPC; asserts discovery of read_project_context, update_business_logic, update_project_settings, log_project_update, create_task, move_task, add_subtask, toggle_subtask.",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R3 & Follow-up 2026-09-12T17:50:32Z",
+              "method": "tools/list",
+              "expectedCount": 15
             },
             {
               "id": "T1-MCP-03",
-              "name": "MCP create_task Execution",
-              "featureId": 9,
-              "description": "Verify create_task creates a Task record with title, category, optional description, and returns confirmation message.",
-              "authoritativeSource": "PROJECT.md Feature 9 & Interface Contracts #1",
-              "input": { "title": "Test MCP Task", "category": "PROJECT", "description": "Created via MCP" },
-              "expectedPattern": "^Tarefa criada com sucesso: [0-9a-fA-F-]{36}$"
+              "name": "MCP update_business_logic Tool Invocation",
+              "description": "Calls update_business_logic via MCP SSE client and asserts businessLogic markdown is updated in database.",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R3",
+              "tool": "update_business_logic"
             },
             {
               "id": "T1-MCP-04",
-              "name": "MCP move_task Execution",
-              "featureId": 10,
-              "description": "Verify move_task updates task status to TODO, IN_PROGRESS, or DONE and returns confirmation.",
-              "authoritativeSource": "PROJECT.md Feature 10 & Interface Contracts #1",
-              "input": { "status": "IN_PROGRESS" },
-              "expectedPattern": "^Tarefa movida para IN_PROGRESS$"
+              "name": "MCP log_project_update Tool Invocation",
+              "description": "Calls log_project_update via MCP SSE client with markdown content and asserts new UpdateLog record is created.",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R3",
+              "tool": "log_project_update"
             },
             {
               "id": "T1-MCP-05",
-              "name": "MCP add_subtask Execution",
-              "featureId": 11,
-              "description": "Verify add_subtask creates a Subtask record linked to taskId and returns confirmation.",
-              "authoritativeSource": "ORIGINAL_REQUEST R1 & PROJECT.md Feature 11",
-              "input": { "title": "Implement Prisma hook" },
-              "expectedPattern": "^Subtarefa criada com sucesso: [0-9a-fA-F-]{36}$"
+              "name": "MCP read_project_context Tool Invocation",
+              "description": "Calls read_project_context via MCP SSE client and asserts complete project graph is returned (stages, tasks, subtasks, logs, members, settings).",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R3",
+              "tool": "read_project_context"
             },
             {
               "id": "T1-MCP-06",
-              "name": "MCP toggle_subtask Execution",
-              "featureId": 12,
-              "description": "Verify toggle_subtask toggles isDone state and returns confirmation.",
-              "authoritativeSource": "ORIGINAL_REQUEST R1 & PROJECT.md Feature 12",
-              "input": { "isDone": true },
-              "expectedPattern": "^Subtarefa [0-9a-fA-F-]{36} marcada como (concluída|pendente)$"
+              "name": "MCP update_project_settings Tool Invocation",
+              "description": "Calls update_project_settings via MCP SSE client to update githubRepo and dynamic settings JSON.",
+              "authoritativeSource": "Follow-up 2026-09-12T17:50:32Z",
+              "tool": "update_project_settings"
+            },
+            {
+              "id": "T1-MCP-07",
+              "name": "MCP create_task and move_task with stageId",
+              "description": "Calls create_task specifying stageId and moves it to DONE using move_task.",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R3",
+              "tool": "create_task"
             }
           ]
         },
         {
-          "domain": "BACKEND_REST",
-          "features": [13, 14, 15, 16, 17, 18, 19],
-          "tests": [
-            {
-              "id": "T1-REST-01",
-              "name": "REST GET /api/tasks Schema and Filters",
-              "featureId": 13,
-              "description": "Verify GET /api/tasks returns 200 with task array containing nested subtasks and supports query params.",
-              "authoritativeSource": "PROJECT.md § Interface Contracts #2",
-              "method": "GET",
-              "path": "/api/tasks",
-              "expectedStatus": 200
-            },
-            {
-              "id": "T1-REST-02",
-              "name": "REST POST /api/tasks Creation",
-              "featureId": 14,
-              "description": "Verify POST /api/tasks creates task and returns 201 with created Task object.",
-              "authoritativeSource": "PROJECT.md § Interface Contracts #2",
-              "method": "POST",
-              "path": "/api/tasks",
-              "input": { "title": "REST Test Task", "category": "COLLEGE", "description": "Study notes" },
-              "expectedStatus": 201
-            },
-            {
-              "id": "T1-REST-03",
-              "name": "REST PATCH /api/tasks/:id Update",
-              "featureId": 15,
-              "description": "Verify PATCH /api/tasks/:id updates status, title, category, or description and returns 200.",
-              "authoritativeSource": "PROJECT.md § Interface Contracts #2",
-              "method": "PATCH",
-              "path": "/api/tasks/:id",
-              "input": { "status": "DONE" },
-              "expectedStatus": 200
-            },
-            {
-              "id": "T1-REST-04",
-              "name": "REST DELETE /api/tasks/:id Deletion",
-              "featureId": 16,
-              "description": "Verify DELETE /api/tasks/:id deletes task and returns 204 No Content.",
-              "authoritativeSource": "PROJECT.md § Interface Contracts #2",
-              "method": "DELETE",
-              "path": "/api/tasks/:id",
-              "expectedStatus": 204
-            },
-            {
-              "id": "T1-REST-05",
-              "name": "REST POST /api/tasks/:id/subtasks Subtask Creation",
-              "featureId": 17,
-              "description": "Verify POST /api/tasks/:id/subtasks creates child subtask and returns 201.",
-              "authoritativeSource": "PROJECT.md § Interface Contracts #2",
-              "method": "POST",
-              "path": "/api/tasks/:id/subtasks",
-              "input": { "title": "Review lecture slides" },
-              "expectedStatus": 201
-            },
-            {
-              "id": "T1-REST-06",
-              "name": "REST PATCH /api/subtasks/:id Subtask Toggle",
-              "featureId": 18,
-              "description": "Verify PATCH /api/subtasks/:id toggles isDone status and returns 200.",
-              "authoritativeSource": "PROJECT.md § Interface Contracts #2",
-              "method": "PATCH",
-              "path": "/api/subtasks/:id",
-              "input": { "isDone": true },
-              "expectedStatus": 200
-            },
-            {
-              "id": "T1-REST-07",
-              "name": "REST DELETE /api/subtasks/:id Subtask Deletion",
-              "featureId": 19,
-              "description": "Verify DELETE /api/subtasks/:id deletes subtask and returns 204.",
-              "authoritativeSource": "PROJECT.md § Interface Contracts #2",
-              "method": "DELETE",
-              "path": "/api/subtasks/:id",
-              "expectedStatus": 204
-            }
-          ]
-        },
-        {
-          "domain": "FRONTEND_UI_CONTRACTS",
-          "features": [20, 21, 22, 23, 24, 25],
-          "tests": [
-            {
-              "id": "T1-UI-01",
-              "name": "3-Column Kanban Board Structure",
-              "featureId": 20,
-              "description": "Verify KanbanBoard renders exactly 3 status columns: TODO ('A Fazer'), IN_PROGRESS ('Em Andamento'), DONE ('Concluído').",
-              "authoritativeSource": "ORIGINAL_REQUEST R2 & proposta_sistema_tarefas.md",
-              "expectedColumns": ["A Fazer", "Em Andamento", "Concluído"]
-            },
-            {
-              "id": "T1-UI-02",
-              "name": "Category Filter Tabs",
-              "featureId": 21,
-              "description": "Verify filter bar provides filters for: Todas, Projetos, Faculdade, Pessoais.",
-              "authoritativeSource": "proposta_sistema_tarefas.md & PROJECT.md Feature 21",
-              "expectedFilters": ["Todas", "Projetos", "Faculdade", "Pessoais"]
-            },
-            {
-              "id": "T1-UI-03",
-              "name": "Task Creation Modal Contract",
-              "featureId": 22,
-              "description": "Verify CreateTaskModal component has inputs for title, category selection (PROJECT, COLLEGE, PERSONAL), and optional description.",
-              "authoritativeSource": "ORIGINAL_REQUEST R2 & PROJECT.md Feature 22",
-              "expectedFields": ["title", "category", "description"]
-            },
-            {
-              "id": "T1-UI-04",
-              "name": "Task Card Status Move Controls",
-              "featureId": 23,
-              "description": "Verify TaskCard provides interactive buttons to move cards forward and backward across columns.",
-              "authoritativeSource": "ORIGINAL_REQUEST R2 & PROJECT.md Feature 23",
-              "expectedActions": ["move_forward", "move_backward", "delete_task"]
-            },
-            {
-              "id": "T1-UI-05",
-              "name": "Subtask Checklist and Progress Counter",
-              "featureId": 24,
-              "description": "Verify TaskCard renders subtasks with checkboxes, strikethrough styling for completed items, and progress counter (e.g., 2/3).",
-              "authoritativeSource": "ORIGINAL_REQUEST R2 & PROJECT.md Feature 24",
-              "expectedFeatures": ["checkbox", "strikethrough", "progress_ratio"]
-            },
-            {
-              "id": "T1-UI-06",
-              "name": "Inline Subtask Addition Input",
-              "featureId": 25,
-              "description": "Verify TaskCard renders input field allowing inline addition of new subtasks without opening full edit modal.",
-              "authoritativeSource": "ORIGINAL_REQUEST R2 & PROJECT.md Feature 25",
-              "expectedFeatures": ["inline_input", "submit_button_or_enter"]
-            }
-          ]
-        },
-        {
-          "domain": "DOCKER_CONFIGS",
-          "features": [26, 27, 28],
+          "domain": "DOCKER_CONFIG",
+          "description": "Containerization and orchestration contracts.",
           "tests": [
             {
               "id": "T1-DOC-01",
-              "name": "Backend Dockerfile Syntax & Directives",
-              "featureId": 26,
-              "description": "Verify backend/Dockerfile uses Node 20 Alpine, generates Prisma client, and exposes port 3000.",
-              "authoritativeSource": "ORIGINAL_REQUEST R3 & PROJECT.md Feature 26",
-              "expectedDirectives": ["FROM node:20-alpine", "prisma generate", "EXPOSE 3000"]
+              "name": "Backend Dockerfile Directives and Prisma Generate",
+              "description": "Verify backend/Dockerfile specifies node:20-alpine, prisma generate, EXPOSE 3000.",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R3"
             },
             {
               "id": "T1-DOC-02",
-              "name": "Frontend Multi-Stage Dockerfile",
-              "featureId": 27,
-              "description": "Verify frontend/Dockerfile implements multi-stage build (Node build stage -> Nginx alpine runtime).",
-              "authoritativeSource": "ORIGINAL_REQUEST R3 & PROJECT.md Feature 27",
-              "expectedDirectives": ["as build", "FROM nginx:alpine", "COPY --from=build"]
+              "name": "Frontend Dockerfile Multi-Stage Build & Nginx Runtime",
+              "description": "Verify frontend/Dockerfile uses multi-stage build and nginx:alpine runtime.",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R3"
             },
             {
               "id": "T1-DOC-03",
-              "name": "Docker Compose Service Composition",
-              "featureId": 28,
-              "description": "Verify docker-compose.yml defines both backend and frontend services, maps ports, and passes DATABASE_URL to backend.",
-              "authoritativeSource": "ORIGINAL_REQUEST R3 & PROJECT.md Feature 28",
-              "expectedServices": ["backend", "frontend"],
-              "expectedEnv": ["DATABASE_URL"]
+              "name": "Root docker-compose.yml Multi-Service Orchestration",
+              "description": "Verify docker-compose.yml orchestrates backend and frontend with DATABASE_URL.",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R3"
             },
             {
               "id": "T1-DOC-04",
-              "name": "Nginx Reverse Proxy Configuration",
-              "featureId": 27,
-              "description": "Verify frontend/nginx.conf proxies /api/ requests to backend:3000 and provides SPA routing fallback.",
-              "authoritativeSource": "PROJECT.md § Interface Contracts #3",
-              "expectedDirectives": ["proxy_pass http://backend:3000", "try_files $uri $uri/ /index.html"]
-            },
-            {
-              "id": "T1-DOC-05",
-              "name": "Vite Development Proxy Configuration",
-              "featureId": 20,
-              "description": "Verify frontend/vite.config.ts configures dev proxy routing /api to http://localhost:3000.",
-              "authoritativeSource": "PROJECT.md § Interface Contracts #3",
-              "expectedDirectives": ["proxy", "target: 'http://localhost:3000'"]
+              "name": "Nginx Reverse Proxy & SPA Fallback Configuration",
+              "description": "Verify frontend/nginx.conf specifies proxy_pass for /api/ and SPA fallback.",
+              "authoritativeSource": "ORIGINAL_REQUEST.md R3"
             }
           ]
         }
@@ -258,156 +277,111 @@
     {
       "tier": 2,
       "tierName": "Boundary & Corner Cases",
-      "description": "Rigorous validation of boundary conditions, edge cases, negative tests, and data integrity constraints.",
+      "description": "Rigorous input validation, error handling, edge cases, payload stress, and security escaping fidelity.",
       "tests": [
         {
           "id": "T2-BND-01",
-          "name": "Empty and Whitespace-Only Task Titles",
-          "features": [9, 14],
-          "description": "Submitting empty string '' or whitespace '   ' as task title must be rejected with 400 Bad Request or validation error.",
-          "input": { "title": "   ", "category": "PROJECT" },
-          "expectedError": true,
-          "expectedStatus": 400
+          "name": "Empty and Whitespace-Only Titles Rejected with 400 Across Entities",
+          "description": "Asserts 400 Bad Request when creating Project, Stage, Task, or Subtask with empty or whitespace-only title.",
+          "authoritativeSource": "explorer_v2_tests_1/handoff.md § 3.2"
         },
         {
           "id": "T2-BND-02",
-          "name": "Extremely Long Title and Description (Resource Stress)",
-          "features": [9, 14],
-          "description": "Verify system handles 1,000+ character titles and descriptions without database failure or unexpected truncation.",
-          "input": { "title": "A".repeat(500), "description": "B".repeat(2000), "category": "PERSONAL" },
-          "expectedStatus": 201
+          "name": "Large Text Payload Stress (Unbounded Text Preservation)",
+          "description": "Stores and retrieves 5,000+ character markdown documents in businessLogic and UpdateLog without truncation.",
+          "authoritativeSource": "backend/prisma/schema.prisma (@db.Text)"
         },
         {
           "id": "T2-BND-03",
-          "name": "Special Characters, Emojis, XSS & SQL Injection Escaping",
-          "features": [9, 14, 17],
-          "description": "Verify system safely stores and returns strings containing quotes, HTML tags, SQL injection payloads, and multibyte UTF-8 emojis.",
-          "input": {
-            "title": "Projeto 'FocusTask' <script>alert(1)</script> 🚀 & \"; DROP TABLE Tasks; --",
-            "description": "Árvore de Natal com maçã & pão 🇧🇷 \n \t \"quotes\" and 'apostrophes'",
-            "category": "PROJECT"
-          },
-          "expectedFidelityCheck": true
+          "name": "Special Characters, UTF-8 Emojis, XSS, and SQL Injection Escaping Fidelity",
+          "description": "Stores complex malicious payloads with quotes, scripts, emojis, and SQL syntax, asserting exact character fidelity and parameterized query protection.",
+          "authoritativeSource": "Adversarial Verification Guidelines"
         },
         {
           "id": "T2-BND-04",
-          "name": "Non-Existent UUID Handling",
-          "features": [10, 15, 16, 17, 18, 19],
-          "description": "Accessing, moving, updating, or adding subtask to non-existent UUID '00000000-0000-0000-0000-000000000000' must return 404 or specific error.",
-          "input": { "id": "00000000-0000-0000-0000-000000000000" },
-          "expectedStatus": 404
+          "name": "Non-Existent UUID Handling Returns 404",
+          "description": "Asserts 404 Not Found for non-existent UUIDs across Project, Stage, UpdateLog, Member, Task, and Subtask routes.",
+          "authoritativeSource": "REST API Error Handling Spec"
         },
         {
           "id": "T2-BND-05",
-          "name": "Invalid Enum Values for Category and Status",
-          "features": [4, 5, 9, 14, 15],
-          "description": "Submitting invalid category 'INVALID_CAT' or status 'PENDING' must be rejected with 400 Bad Request.",
-          "input": { "title": "Invalid Enum Test", "category": "INVALID_CAT" },
-          "expectedStatus": 400
+          "name": "Invalid Enum Values Rejected with 400 Bad Request",
+          "description": "Asserts 400 Bad Request when passing invalid values for ProjectStatus, StageStatus, or Status enums.",
+          "authoritativeSource": "backend/prisma/schema.prisma Enums"
         },
         {
           "id": "T2-BND-06",
-          "name": "Cascade Deletion Integrity",
-          "features": [3, 16, 19],
-          "description": "Deleting a Task record must automatically cascade-delete all child subtasks in the database.",
-          "workflow": [
-            "Create task with title 'Cascade Parent'",
-            "Add 3 subtasks to task",
-            "Verify all 3 subtasks exist in database",
-            "Delete parent task",
-            "Verify parent task is gone (404)",
-            "Verify all 3 subtasks are completely removed (not orphaned)"
-          ]
+          "name": "Project Settings JSON Validation & Null Handling",
+          "description": "Accepts complex nested JSON settings objects, handles null and empty settings gracefully without schema corruption.",
+          "authoritativeSource": "Follow-up 2026-09-12T17:50:32Z"
         },
         {
           "id": "T2-BND-07",
-          "name": "Subtask Toggle State Inversion vs Explicit Boolean",
-          "features": [12, 18],
-          "description": "Verify toggle endpoint inverts state when isDone is omitted, and sets explicit boolean when provided.",
-          "workflow": [
-            "Create subtask (defaults to isDone=false)",
-            "Call toggle with no body -> isDone becomes true",
-            "Call toggle with no body -> isDone becomes false",
-            "Call toggle with isDone: true -> isDone remains true",
-            "Call toggle with isDone: true -> isDone remains true"
-          ]
-        },
-        {
-          "id": "T2-BND-08",
-          "name": "Subtask Creation with Missing Title or Missing Parent",
-          "features": [11, 17],
-          "description": "Adding a subtask with empty title or to a non-existent parent must be rejected.",
-          "input": { "title": "" },
-          "expectedStatus": 400
+          "name": "Member Validation and Optional Email Support",
+          "description": "Rejects missing required fields (name, role) with 400 Bad Request and validates member creation with email.",
+          "authoritativeSource": "Follow-up 2026-09-12T17:50:32Z"
         }
       ]
     },
     {
       "tier": 3,
-      "tierName": "Cross-Feature Combinations",
-      "description": "Multi-step workflows combining multiple features across MCP and REST interfaces.",
+      "tierName": "Cascade Deletion & Cross-Feature Combinations",
+      "description": "Verification of relational integrity, cascade deletions across all 3 tiers of the hierarchy, and dual REST <-> MCP synchronization.",
       "tests": [
         {
+          "id": "T3-CAS-01",
+          "name": "Full Hierarchy Cascade: Project Deletion Purges All Child Entities",
+          "description": "Creates Project -> Stages -> Tasks -> Subtasks -> UpdateLogs -> Members. Deletes Project; verifies ALL child entities return 404.",
+          "authoritativeSource": "backend/prisma/schema.prisma (onDelete: Cascade)"
+        },
+        {
+          "id": "T3-CAS-02",
+          "name": "Stage Cascade: Stage Deletion Purges Tasks and Subtasks",
+          "description": "Deletes a Stage; verifies all child Tasks and Subtasks return 404, while parent Project and sibling Stages remain intact.",
+          "authoritativeSource": "backend/prisma/schema.prisma (onDelete: Cascade)"
+        },
+        {
+          "id": "T3-CAS-03",
+          "name": "Task Cascade: Task Deletion Purges Subtasks",
+          "description": "Deletes a Task; verifies child Subtasks return 404 while parent Stage and sibling Tasks remain intact.",
+          "authoritativeSource": "backend/prisma/schema.prisma (onDelete: Cascade)"
+        },
+        {
           "id": "T3-CMB-01",
-          "name": "Full Task & Subtask Lifecycle (Create -> Subtasks -> Progress -> Complete -> Delete)",
-          "features": [1, 2, 3, 14, 15, 16, 17, 18],
-          "description": "Execute complete end-to-end task lifecycle: Create TODO task, add 3 subtasks, toggle 2 to done, move task to IN_PROGRESS, complete final subtask, move task to DONE, verify state consistency, delete task, verify cascade cleanup.",
-          "steps": 7
+          "name": "Dual Interface Synchronization (REST ↔ MCP Shared State)",
+          "description": "REST creates Project & Stage -> MCP updates businessLogic -> REST reads back updated state -> REST adds Task -> MCP reads context -> MCP adds Task -> REST verifies.",
+          "authoritativeSource": "ORIGINAL_REQUEST.md R2/R3"
         },
         {
           "id": "T3-CMB-02",
-          "name": "Dual Interface Synchronization (MCP ↔ REST Interoperability)",
-          "features": [8, 9, 10, 11, 12, 13, 14, 15, 16],
-          "description": "Create task via MCP -> Read via REST API -> Add subtask via REST API -> Toggle subtask via MCP -> Move task status via REST -> Query filtered task via MCP -> Delete via REST -> Confirm deleted on both.",
-          "steps": 8
-        },
-        {
-          "id": "T3-CMB-03",
-          "name": "Category and Status Multi-Filter Matrix",
-          "features": [4, 5, 8, 13, 21],
-          "description": "Create tasks covering all 3 categories (PROJECT, COLLEGE, PERSONAL) and all 3 statuses (TODO, IN_PROGRESS, DONE). Test all 9 combinations of category and status filters via REST and MCP, verifying exact subset isolation.",
-          "matrixCombinations": 9
-        },
-        {
-          "id": "T3-CMB-04",
-          "name": "Independent Subtask Scoping Across Sibling Tasks",
-          "features": [2, 17, 18, 19],
-          "description": "Create Task A and Task B with identically named subtasks. Modifying or deleting subtasks on Task A must have zero side effects on Task B.",
-          "steps": 5
+          "name": "Multi-Stage Task Scoping and Isolation",
+          "description": "Tasks created in Stage A are strictly isolated from Stage B. Deleting Stage A leaves Stage B and its tasks completely unaffected.",
+          "authoritativeSource": "Relational Scoping Architecture"
         }
       ]
     },
     {
       "tier": 4,
       "tierName": "Real-World Application Scenarios",
-      "description": "End-to-end realistic usage personas reflecting user goals and workflows.",
+      "description": "Autonomous AI Agent Project Onboarding & Software Development Lifecycle.",
       "tests": [
         {
           "id": "T4-SCN-01",
-          "name": "Software Engineering Sprint Workflow",
-          "persona": "Full-stack Software Engineer",
-          "scenario": "Agile Sprint Delivery",
-          "category": "PROJECT",
-          "story": "Developer creates sprint epic 'Deploy FocusTask MVP to Production'. Breaks down work into 4 subtasks (Docker backend, Docker frontend, Compose setup, Remote DB migration). Moves card to 'Em Andamento', completes subtasks incrementally, adds emergent bug fix subtask 'Fix Alpine openssl package', marks all done, and completes card to 'Concluído'.",
-          "expectedResult": "Task progresses smoothly through Kanban stages with real-time subtask counter reflecting 5/5 completed."
+          "name": "Autonomous AI Project Onboarding & SDLC Lifecycle Scenario",
+          "description": "Complete real-world execution: 1. REST creates Project with githubRepo and settings; 2. REST defines 3 Stages; 3. REST adds team members; 4. MCP updates business logic; 5. MCP logs kickoff update; 6. MCP creates tasks under Stage 1; 7. Subtasks added; 8. Tasks completed; 9. Stage marked COMPLETED; 10. MCP reads full context; 11. Clean cascade teardown.",
+          "authoritativeSource": "ORIGINAL_REQUEST.md R4 & explorer_v2_tests_1/handoff.md § 3.2"
         },
         {
           "id": "T4-SCN-02",
-          "name": "University Semester Exam Preparation",
-          "persona": "Computer Science Undergraduate",
-          "scenario": "Final Exam Study Plan",
-          "category": "COLLEGE",
-          "story": "Student creates study card 'Sistemas Distribuídos - Prova Final'. Adds checklist for topics: 'Revisar Raft Consensus', 'Resolver lista 3', 'Assistir gravação sobre RPC'. Filters Kanban board by 'Faculdade' to eliminate project distractions. Completes study units during exam week, moves card to 'Concluído' after exam day.",
-          "expectedResult": "Category filtering accurately isolates college tasks, progress counter tracks study items."
+          "name": "Rapid Agile Milestone Delivery Scenario",
+          "description": "Simulates rapid sprint progression: creates feature milestone, creates tasks, transitions statuses, records progress logs, and verifies delivery state.",
+          "authoritativeSource": "Agile Workflow Specifications"
         },
         {
           "id": "T4-SCN-03",
-          "name": "Personal Life and Weekend Errands",
-          "persona": "Busy Individual",
-          "scenario": "Saturday Home Maintenance & Shopping",
-          "category": "PERSONAL",
-          "story": "User creates weekend checklist 'Tarefas de Sábado'. Adds checklist items: 'Comprar café em grãos', 'Trocar lâmpada da sala', 'Pagar fatura do cartão'. Toggles tasks off one by one from mobile browser view, deletes item that was cancelled, moves card to DONE when all finished.",
-          "expectedResult": "Immediate checklist feedback, subtask deletion without affecting parent card, clean board."
+          "name": "Audit Trail & Project Governance Scenario",
+          "description": "Simulates multiple AI and human contributors adding update logs, modifying technical settings, and verifying complete audit trail retrieval.",
+          "authoritativeSource": "Governance & Compliance Logging Spec"
         }
       ]
     }

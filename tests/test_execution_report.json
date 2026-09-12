@@ -1,161 +1,193 @@
 {
-  "timestamp": "2026-09-12T17:23:08.011Z",
+  "timestamp": "2026-09-12T19:40:46.190Z",
   "targetWorkspace": "C:/Users/Kaue/Desktop/BrainBoard",
-  "isLive": false,
-  "total": 37,
-  "passed": 37,
+  "isLive": true,
+  "total": 41,
+  "passed": 41,
   "failed": 0,
   "skipped": 0,
   "passRate": "100.0%",
   "results": [
     {
+      "id": "T1-PRJ-01",
+      "tier": 1,
+      "name": "REST POST /api/projects - Project Creation with Metadata and Settings",
+      "domain": "REST_PROJECT",
+      "status": "PASSED",
+      "durationMs": 976
+    },
+    {
+      "id": "T1-PRJ-02",
+      "tier": 1,
+      "name": "REST GET /api/projects and GET /api/projects/:id - Listing and Full Details",
+      "domain": "REST_PROJECT",
+      "status": "PASSED",
+      "durationMs": 113
+    },
+    {
+      "id": "T1-PRJ-03",
+      "tier": 1,
+      "name": "REST PATCH /api/projects/:id - Status Transition and Field Updates",
+      "domain": "REST_PROJECT",
+      "status": "PASSED",
+      "durationMs": 50
+    },
+    {
+      "id": "T1-PRJ-04",
+      "tier": 1,
+      "name": "REST PATCH /api/projects/:id/business-logic - Dedicated Business Logic Route",
+      "domain": "REST_PROJECT",
+      "status": "PASSED",
+      "durationMs": 17
+    },
+    {
+      "id": "T1-PRJ-05",
+      "tier": 1,
+      "name": "REST PATCH /api/projects/:id/settings - Dedicated Settings Route",
+      "domain": "REST_PROJECT",
+      "status": "PASSED",
+      "durationMs": 19
+    },
+    {
+      "id": "T1-STG-01",
+      "tier": 1,
+      "name": "REST POST /api/projects/:projectId/stages - Stage Creation with Auto-Order",
+      "domain": "REST_STAGE",
+      "status": "PASSED",
+      "durationMs": 121
+    },
+    {
+      "id": "T1-STG-02",
+      "tier": 1,
+      "name": "REST GET /api/projects/:projectId/stages & PATCH /api/stages/:id - Listing and Status",
+      "domain": "REST_STAGE",
+      "status": "PASSED",
+      "durationMs": 121
+    },
+    {
+      "id": "T1-LOG-01",
+      "tier": 1,
+      "name": "REST POST /api/projects/:projectId/update-logs - Rich Markdown Log Creation",
+      "domain": "REST_LOG",
+      "status": "PASSED",
+      "durationMs": 27
+    },
+    {
+      "id": "T1-LOG-02",
+      "tier": 1,
+      "name": "REST GET /api/projects/:projectId/update-logs & GET /api/update-logs/:id",
+      "domain": "REST_LOG",
+      "status": "PASSED",
+      "durationMs": 39
+    },
+    {
+      "id": "T1-MBR-01",
+      "tier": 1,
+      "name": "REST POST /api/projects/:projectId/members - Member Creation with Email and Role",
+      "domain": "REST_MEMBER",
+      "status": "PASSED",
+      "durationMs": 26
+    },
+    {
+      "id": "T1-MBR-02",
+      "tier": 1,
+      "name": "REST GET /api/projects/:projectId/members & PATCH /api/members/:id",
+      "domain": "REST_MEMBER",
+      "status": "PASSED",
+      "durationMs": 35
+    },
+    {
+      "id": "T1-TSK-01",
+      "tier": 1,
+      "name": "REST POST /api/stages/:stageId/tasks - Task Creation Scoped to Stage",
+      "domain": "REST_TASK",
+      "status": "PASSED",
+      "durationMs": 80
+    },
+    {
+      "id": "T1-TSK-02",
+      "tier": 1,
+      "name": "REST GET /api/stages/:stageId/tasks & PATCH /api/tasks/:id - Progress Workflow",
+      "domain": "REST_TASK",
+      "status": "PASSED",
+      "durationMs": 103
+    },
+    {
+      "id": "T1-SUB-01",
+      "tier": 1,
+      "name": "REST POST /api/tasks/:id/subtasks - Subtask Creation Under Task",
+      "domain": "REST_SUBTASK",
+      "status": "PASSED",
+      "durationMs": 34
+    },
+    {
+      "id": "T1-SUB-02",
+      "tier": 1,
+      "name": "REST PATCH /api/subtasks/:id - Subtask Toggle State",
+      "domain": "REST_SUBTASK",
+      "status": "PASSED",
+      "durationMs": 33
+    },
+    {
       "id": "T1-MCP-01",
       "tier": 1,
-      "name": "MCP Server Tool Registrations Contract",
-      "domain": "BACKEND_MCP",
+      "name": "MCP Real SSE Connection & Session Handshake",
+      "domain": "MCP_SSE",
       "status": "PASSED",
       "durationMs": 1
     },
     {
       "id": "T1-MCP-02",
       "tier": 1,
-      "name": "MCP SSE Transport Endpoints Contract",
-      "domain": "BACKEND_MCP",
+      "name": "MCP tools/list Schema Discovery (All 15 Tools Verified)",
+      "domain": "MCP_TOOLS",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 24
     },
     {
       "id": "T1-MCP-03",
       "tier": 1,
-      "name": "MCP add_subtask Handler Implementation",
-      "domain": "BACKEND_MCP",
+      "name": "MCP update_business_logic Tool Invocation Over SSE",
+      "domain": "MCP_EXEC",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 70
     },
     {
       "id": "T1-MCP-04",
       "tier": 1,
-      "name": "MCP toggle_subtask Handler Implementation",
-      "domain": "BACKEND_MCP",
+      "name": "MCP log_project_update Tool Invocation Over SSE",
+      "domain": "MCP_EXEC",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 43
     },
     {
       "id": "T1-MCP-05",
       "tier": 1,
-      "name": "MCP list_tasks Query Filtering Logic",
-      "domain": "BACKEND_MCP",
+      "name": "MCP read_project_context Tool Invocation Over SSE",
+      "domain": "MCP_EXEC",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 56
     },
     {
-      "id": "T1-REST-01",
+      "id": "T1-MCP-06",
       "tier": 1,
-      "name": "REST GET /api/tasks Endpoint",
-      "domain": "BACKEND_REST",
+      "name": "MCP update_project_settings Tool Invocation Over SSE",
+      "domain": "MCP_EXEC",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 61
     },
     {
-      "id": "T1-REST-02",
+      "id": "T1-MCP-07",
       "tier": 1,
-      "name": "REST POST /api/tasks Task Creation",
-      "domain": "BACKEND_REST",
+      "name": "MCP create_task & move_task with stageId Over SSE",
+      "domain": "MCP_EXEC",
       "status": "PASSED",
-      "durationMs": 0
-    },
-    {
-      "id": "T1-REST-03",
-      "tier": 1,
-      "name": "REST PATCH /api/tasks/:id Status & Details Update",
-      "domain": "BACKEND_REST",
-      "status": "PASSED",
-      "durationMs": 1
-    },
-    {
-      "id": "T1-REST-04",
-      "tier": 1,
-      "name": "REST DELETE /api/tasks/:id Deletion",
-      "domain": "BACKEND_REST",
-      "status": "PASSED",
-      "durationMs": 0
-    },
-    {
-      "id": "T1-REST-05",
-      "tier": 1,
-      "name": "REST POST /api/tasks/:id/subtasks Subtask Creation",
-      "domain": "BACKEND_REST",
-      "status": "PASSED",
-      "durationMs": 0
-    },
-    {
-      "id": "T1-REST-06",
-      "tier": 1,
-      "name": "REST PATCH /api/subtasks/:id Subtask Toggle",
-      "domain": "BACKEND_REST",
-      "status": "PASSED",
-      "durationMs": 0
-    },
-    {
-      "id": "T1-REST-07",
-      "tier": 1,
-      "name": "REST DELETE /api/subtasks/:id Subtask Deletion",
-      "domain": "BACKEND_REST",
-      "status": "PASSED",
-      "durationMs": 0
-    },
-    {
-      "id": "T1-UI-01",
-      "tier": 1,
-      "name": "Frontend Kanban 3-Column Board Structure",
-      "domain": "FRONTEND_UI",
-      "status": "PASSED",
-      "durationMs": 1
-    },
-    {
-      "id": "T1-UI-02",
-      "tier": 1,
-      "name": "Frontend Category Filter Bar Implementation",
-      "domain": "FRONTEND_UI",
-      "status": "PASSED",
-      "durationMs": 0
-    },
-    {
-      "id": "T1-UI-03",
-      "tier": 1,
-      "name": "Frontend Task Creation Modal Validation",
-      "domain": "FRONTEND_UI",
-      "status": "PASSED",
-      "durationMs": 0
-    },
-    {
-      "id": "T1-UI-04",
-      "tier": 1,
-      "name": "Frontend Task Card Subtask Checklist & Action Controls",
-      "domain": "FRONTEND_UI",
-      "status": "PASSED",
-      "durationMs": 1
-    },
-    {
-      "id": "T1-UI-05",
-      "tier": 1,
-      "name": "Frontend Inline Subtask Addition Input",
-      "domain": "FRONTEND_UI",
-      "status": "PASSED",
-      "durationMs": 0
-    },
-    {
-      "id": "T1-UI-06",
-      "tier": 1,
-      "name": "Frontend API Client Service Contract",
-      "domain": "FRONTEND_UI",
-      "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 112
     },
     {
       "id": "T1-DOC-01",
       "tier": 1,
-      "name": "Backend Dockerfile Directives and Prisma Client",
+      "name": "Backend Dockerfile Directives and Prisma Generate",
       "domain": "DOCKER_CONFIG",
       "status": "PASSED",
       "durationMs": 1
@@ -166,7 +198,7 @@
       "name": "Frontend Dockerfile Multi-Stage Build & Nginx Runtime",
       "domain": "DOCKER_CONFIG",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 2
     },
     {
       "id": "T1-DOC-03",
@@ -182,113 +214,112 @@
       "name": "Nginx Reverse Proxy Configuration & SPA Fallback",
       "domain": "DOCKER_CONFIG",
       "status": "PASSED",
-      "durationMs": 0
-    },
-    {
-      "id": "T1-DOC-05",
-      "tier": 1,
-      "name": "Vite Development Proxy Configuration",
-      "domain": "DOCKER_CONFIG",
-      "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T2-BND-01",
       "tier": 2,
-      "name": "Empty and Whitespace-Only Task Titles Rejected",
+      "name": "Empty and Whitespace-Only Titles Rejected with 400 Across Entities",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 149
     },
     {
       "id": "T2-BND-02",
       "tier": 2,
-      "name": "Resource Stress: 1,000+ Character Title and Description",
+      "name": "Large Text Payload Stress (5,000+ chars in businessLogic and UpdateLog)",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 101
     },
     {
       "id": "T2-BND-03",
       "tier": 2,
-      "name": "Special Characters, XSS, & SQL Injection Escaping Fidelity",
+      "name": "Special Characters, UTF-8 Emojis, XSS, and SQL Injection Escaping Fidelity",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 78
     },
     {
       "id": "T2-BND-04",
       "tier": 2,
-      "name": "Non-Existent UUID Handling Returns 404",
+      "name": "Non-Existent UUID Handling Returns 404 Across Entities",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 170
     },
     {
       "id": "T2-BND-05",
       "tier": 2,
-      "name": "Invalid Category and Status Enum Values Rejected",
+      "name": "Invalid Enum Values Rejected with 400 Bad Request",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 92
     },
     {
       "id": "T2-BND-06",
       "tier": 2,
-      "name": "Cascade Deletion Integrity Contract (onDelete: Cascade)",
+      "name": "Project Settings JSON Validation & Null Handling",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 64
     },
     {
       "id": "T2-BND-07",
       "tier": 2,
-      "name": "Subtask Toggle State Inversion Contract",
+      "name": "Member Validation and Optional Email Support",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 81
+    },
+    {
+      "id": "T3-CAS-01",
+      "tier": 3,
+      "name": "Full Hierarchy Cascade: Project Deletion Purges All Child Entities",
+      "status": "PASSED",
+      "durationMs": 237
+    },
+    {
+      "id": "T3-CAS-02",
+      "tier": 3,
+      "name": "Stage Cascade: Stage Deletion Purges Tasks and Subtasks While Preserving Project",
+      "status": "PASSED",
+      "durationMs": 317
+    },
+    {
+      "id": "T3-CAS-03",
+      "tier": 3,
+      "name": "Task Cascade: Task Deletion Purges Subtasks While Preserving Stage",
+      "status": "PASSED",
+      "durationMs": 221
     },
     {
       "id": "T3-CMB-01",
       "tier": 3,
-      "name": "Full Lifecycle: Create Task -> Add Subtasks -> Progress -> Complete -> Delete",
+      "name": "Dual Interface Synchronization (REST ↔ MCP Interoperability)",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 314
     },
     {
       "id": "T3-CMB-02",
       "tier": 3,
-      "name": "Dual Interface Synchronization (MCP ↔ REST Interoperability)",
+      "name": "Multi-Stage Task Scoping and Isolation",
       "status": "PASSED",
-      "durationMs": 0
-    },
-    {
-      "id": "T3-CMB-03",
-      "tier": 3,
-      "name": "Category and Status Multi-Filter Matrix Contract",
-      "status": "PASSED",
-      "durationMs": 0
-    },
-    {
-      "id": "T3-CMB-04",
-      "tier": 3,
-      "name": "Subtask Isolation Across Sibling Tasks",
-      "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 542
     },
     {
       "id": "T4-SCN-01",
       "tier": 4,
-      "name": "Scenario 1: Agile Sprint Delivery Workflow (PROJECT)",
+      "name": "Autonomous AI Project Onboarding & Full SDLC Lifecycle Execution",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 603
     },
     {
       "id": "T4-SCN-02",
       "tier": 4,
-      "name": "Scenario 2: Academic Semester Exam Preparation (COLLEGE)",
+      "name": "Rapid Agile Milestone Delivery & Stage Transition Scenario",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 367
     },
     {
       "id": "T4-SCN-03",
       "tier": 4,
-      "name": "Scenario 3: Personal Weekend Errands (PERSONAL)",
+      "name": "Audit Trail & Project Governance Verification Scenario",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 137
     }
   ]
 }
