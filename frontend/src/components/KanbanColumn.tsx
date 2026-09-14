@@ -1,16 +1,18 @@
 import React from 'react';
 import { Clock, PlayCircle, CheckCircle2, Layers } from 'lucide-react';
-import { Task, Status, STATUS_LABELS } from '../types/task';
+import type { Task, TaskStatus } from '../types';
+import { TASK_STATUS_LABELS } from '../types';
 import { TaskCard } from './TaskCard';
 
-interface KanbanColumnProps {
-  status: Status;
+export interface KanbanColumnProps {
+  status: TaskStatus;
   tasks: Task[];
-  onMoveTask: (id: string, status: Status) => Promise<void>;
+  onMoveTask: (id: string, status: TaskStatus) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
   onAddSubtask: (taskId: string, title: string) => Promise<void>;
   onToggleSubtask: (id: string, isDone: boolean) => Promise<void>;
   onDeleteSubtask?: (id: string) => Promise<void>;
+  onOpenCreateTask?: () => void;
 }
 
 export const KanbanColumn: React.FC<KanbanColumnProps> = ({
@@ -23,7 +25,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   onDeleteSubtask,
 }) => {
   const columnConfig: Record<
-    Status,
+    TaskStatus,
     {
       icon: React.ReactNode;
       accentBorder: string;
@@ -62,7 +64,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
         <div className="flex items-center gap-2">
           {config.icon}
           <h3 className="text-xs font-extrabold text-slate-800 tracking-wider uppercase">
-            {STATUS_LABELS[status]}
+            {TASK_STATUS_LABELS[status]}
           </h3>
         </div>
         <span

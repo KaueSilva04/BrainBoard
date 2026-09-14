@@ -1,54 +1,41 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, Sparkles, Layers, CheckCircle2, Clock, PlayCircle } from 'lucide-react';
-import type { Stage, TaskStatus, CreateTaskInput } from '../types';
-import { TASK_STATUS_LABELS } from '../types';
+import { X, Loader2, FolderKanban, Github, FileText, CheckCircle2, Clock, Sparkles } from 'lucide-react';
+import type { CreateProjectInput, ProjectStatus } from '../types';
+import { PROJECT_STATUS_LABELS } from '../types';
 
-export interface CreateTaskModalProps {
+export interface CreateProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  stages: Stage[];
-  defaultStageId?: string;
-  onCreateTask: (stageId: string, input: CreateTaskInput) => Promise<void>;
-  defaultCategory?: string;
+  onCreateProject: (input: CreateProjectInput) => Promise<void>;
 }
 
-export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
+export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   isOpen,
   onClose,
-  stages,
-  defaultStageId,
-  onCreateTask,
+  onCreateProject,
 }) => {
   const [title, setTitle] = useState('');
-  const [selectedStageId, setSelectedStageId] = useState<string>('');
-  const [status, setStatus] = useState<TaskStatus>('TODO');
   const [description, setDescription] = useState('');
+  const [status, setStatus] = useState<ProjectStatus>('ACTIVE');
+  const [githubRepo, setGithubRepo] = useState('');
+  const [businessLogic, setBusinessLogic] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Sync default stage and reset fields when modal opens
   useEffect(() => {
     if (isOpen) {
       setTitle('');
       setDescription('');
-      setStatus('TODO');
+      setStatus('ACTIVE');
+      setGithubRepo('');
+      setBusinessLogic('');
       setErrorMessage('');
-      if (defaultStageId && stages.some((s) => s.id === defaultStageId)) {
-        setSelectedStageId(defaultStageId);
-      } else if (stages.length > 0) {
-        setSelectedStageId(stages[0].id);
-      } else {
-        setSelectedStageId('');
-      }
     }
-  }, [isOpen, defaultStageId, stages]);
+  }, [isOpen]);
 
-  // Handle ESC key press
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
+      if (e.key === 'Escape' && isOpen) onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -59,14 +46,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanTitle = title.trim();
-
     if (!cleanTitle) {
-      setErrorMessage('O título da tarefa é obrigatório.');
-      return;
-    }
-
-    if (!selectedStageId) {
-      setErrorMessage('Selecione uma etapa para a tarefa.');
+      setErrorMessage('O título do projeto é obrigatório.');
       return;
     }
 
@@ -74,21 +55,23 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     setErrorMessage('');
 
     try {
-      await onCreateTask(selectedStageId, {
+      await onCreateProject({
         title: cleanTitle,
         description: description.trim() || undefined,
         status,
+        githubRepo: githubRepo.trim() || undefined,
+        businessLogic: businessLogic.trim() || undefined,
       });
       onClose();
     } catch (err: any) {
-      setErrorMessage(err.message || 'Erro ao criar tarefa. Tente novamente.');
+      setErrorMessage(err.message || 'Erro ao criar projeto. Tente novamente.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const statusOptions: {
-    id: TaskStatus;
+    id: ProjectStatus;
     label: string;
     icon: React.ReactNode;
     activeBorder: string;
@@ -96,24 +79,24 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     textColor: string;
   }[] = [
     {
-      id: 'TODO',
-      label: TASK_STATUS_LABELS.TODO,
+      id: 'PLANNING',
+      label: PROJECT_STATUS_LABELS.PLANNING,
       icon: <Clock className="w-4 h-4" />,
       activeBorder: 'border-amber-400 ring-2 ring-amber-400/20',
       activeBg: 'bg-amber-50/80',
       textColor: 'text-amber-700',
     },
     {
-      id: 'IN_PROGRESS',
-      label: TASK_STATUS_LABELS.IN_PROGRESS,
-      icon: <PlayCircle className="w-4 h-4" />,
-      activeBorder: 'border-indigo-400 ring-2 ring-indigo-400/20',
-      activeBg: 'bg-indigo-50/80',
-      textColor: 'text-indigo-700',
+      id: 'ACTIVE',
+      label: PROJECT_STATUS_LABELS.ACTIVE,
+      icon: <Sparkles className="w-4 h-4" />,
+      activeBorder: 'border-blue-400 ring-2 ring-blue-400/20',
+      activeBg: 'bg-blue-50/80',
+      textColor: 'text-blue-700',
     },
     {
-      id: 'DONE',
-      label: TASK_STATUS_LABELS.DONE,
+      id: 'COMPLETED',
+      label: PROJECT_STATUS_LABELS.COMPLETED,
       icon: <CheckCircle2 className="w-4 h-4" />,
       activeBorder: 'border-emerald-400 ring-2 ring-emerald-400/20',
       activeBg: 'bg-emerald-50/80',
@@ -131,14 +114,14 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-100 bg-white">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-              <Sparkles className="w-4 h-4" />
+              <FolderKanban className="w-4 h-4" />
             </div>
             <div>
               <h2 className="text-base font-extrabold text-slate-900 leading-tight">
-                Nova Tarefa
+                Novo Projeto
               </h2>
               <p className="text-[11px] text-slate-400">
-                Cadastre uma tarefa vinculada a uma etapa do projeto
+                Crie um novo projeto com etapas e controle inteligente
               </p>
             </div>
           </div>
@@ -152,7 +135,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
           {errorMessage && (
             <div className="p-3 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-xl font-medium">
               {errorMessage}
@@ -161,45 +144,19 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
 
           {/* Title Field */}
           <div className="space-y-1.5">
-            <label htmlFor="task-title" className="block text-xs font-bold text-slate-700">
-              Título da Tarefa <span className="text-rose-500">*</span>
+            <label htmlFor="project-title" className="block text-xs font-bold text-slate-700">
+              Título do Projeto <span className="text-rose-500">*</span>
             </label>
             <input
-              id="task-title"
+              id="project-title"
               name="title"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ex: Implementar autenticação via token..."
+              placeholder="Ex: Plataforma E-commerce V2..."
               autoFocus
               className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
             />
-          </div>
-
-          {/* Stage Selector */}
-          <div className="space-y-1.5">
-            <label htmlFor="stage-select" className="block text-xs font-bold text-slate-700">
-              Etapa (Milestone) <span className="text-rose-500">*</span>
-            </label>
-            {stages.length === 0 ? (
-              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-700 flex items-center gap-2">
-                <Layers className="w-4 h-4 shrink-0" />
-                <span>Nenhuma etapa cadastrada neste projeto. Crie uma etapa primeiro!</span>
-              </div>
-            ) : (
-              <select
-                id="stage-select"
-                value={selectedStageId}
-                onChange={(e) => setSelectedStageId(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
-              >
-                {stages.map((stage) => (
-                  <option key={stage.id} value={stage.id}>
-                    {stage.title}
-                  </option>
-                ))}
-              </select>
-            )}
           </div>
 
           {/* Status Selector */}
@@ -214,7 +171,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                   <label key={opt.id} className="cursor-pointer">
                     <input
                       type="radio"
-                      name="status"
+                      name="projectStatus"
                       value={opt.id}
                       checked={isChecked}
                       onChange={() => setStatus(opt.id)}
@@ -238,17 +195,51 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
 
           {/* Description Field */}
           <div className="space-y-1.5">
-            <label htmlFor="task-desc" className="block text-xs font-bold text-slate-700">
+            <label htmlFor="project-desc" className="block text-xs font-bold text-slate-700">
               Descrição <span className="text-slate-400 font-normal">(Opcional)</span>
             </label>
             <textarea
-              id="task-desc"
+              id="project-desc"
               name="description"
-              rows={3}
+              rows={2}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Adicione detalhes, notas ou contexto para esta tarefa..."
+              placeholder="Objetivos e escopo do projeto..."
               className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all resize-none"
+            />
+          </div>
+
+          {/* GitHub Repo */}
+          <div className="space-y-1.5">
+            <label htmlFor="project-github" className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
+              <Github className="w-3.5 h-3.5 text-slate-500" />
+              <span>Repositório GitHub <span className="text-slate-400 font-normal">(Opcional)</span></span>
+            </label>
+            <input
+              id="project-github"
+              name="githubRepo"
+              type="text"
+              value={githubRepo}
+              onChange={(e) => setGithubRepo(e.target.value)}
+              placeholder="https://github.com/usuario/repositorio"
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
+            />
+          </div>
+
+          {/* Business Logic (for AI MCP context) */}
+          <div className="space-y-1.5">
+            <label htmlFor="project-businessLogic" className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5 text-slate-500" />
+              <span>Lógica de Negócio (Contexto MCP / IA) <span className="text-slate-400 font-normal">(Opcional)</span></span>
+            </label>
+            <textarea
+              id="project-businessLogic"
+              name="businessLogic"
+              rows={3}
+              value={businessLogic}
+              onChange={(e) => setBusinessLogic(e.target.value)}
+              placeholder="Regras de negócio, arquitetura técnica e diretrizes de IA..."
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all resize-none font-mono text-xs"
             />
           </div>
 
@@ -263,16 +254,16 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !title.trim() || !selectedStageId}
+              disabled={isSubmitting || !title.trim()}
               className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2"
             >
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Salvando...</span>
+                  <span>Criando...</span>
                 </>
               ) : (
-                <span>Criar Tarefa</span>
+                <span>Criar Projeto</span>
               )}
             </button>
           </div>

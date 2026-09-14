@@ -12,64 +12,69 @@ import {
   Sparkles,
   Menu,
   X,
+  Layers,
+  ChevronRight,
 } from 'lucide-react';
-import { CategoryFilter } from '../types/task';
+import type { ProjectSummary } from '../types';
 
 export interface NavbarProps {
-  selectedCategory: CategoryFilter;
-  onSelectCategory: (category: CategoryFilter) => void;
-  categoryCounts: {
-    ALL: number;
-    PROJECT: number;
-    COLLEGE: number;
-    PERSONAL: number;
-  };
+  currentView?: 'PROJECTS' | 'BOARD';
+  onSelectView?: (view: 'PROJECTS' | 'BOARD') => void;
+  projects?: ProjectSummary[];
+  activeProjectId?: string | null;
+  onSelectProject?: (id: string | null) => void;
+  onOpenCreateProjectModal?: () => void;
   onOpenCreateModal: () => void;
   isConnected?: boolean;
+  selectedCategory?: string;
+  onSelectCategory?: (category: string) => void;
+  categoryCounts?: {
+    ALL?: number;
+    PROJECT?: number;
+    COLLEGE?: number;
+    PERSONAL?: number;
+    [key: string]: number | undefined;
+  };
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
-  selectedCategory,
-  onSelectCategory,
-  categoryCounts,
+  currentView = 'BOARD',
+  onSelectView,
+  projects = [],
+  activeProjectId = null,
+  onSelectProject,
+  onOpenCreateProjectModal,
   onOpenCreateModal,
   isConnected = true,
+  selectedCategory = 'ALL',
+  onSelectCategory,
+  categoryCounts = { ALL: 0, PROJECT: 0, COLLEGE: 0, PERSONAL: 0 },
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const categoryFilters: {
-    id: CategoryFilter;
-    label: string;
-    icon: React.ReactNode;
-    color: string;
-    activeBg: string;
-  }[] = [
+  const categoryFilters = [
     {
       id: 'ALL',
       label: 'Todas',
       icon: <LayoutGrid className="w-4 h-4" />,
-      color: 'text-slate-600',
       activeBg: 'bg-indigo-50 text-indigo-600 font-semibold',
     },
     {
       id: 'PROJECT',
       label: 'Projetos',
       icon: <FolderKanban className="w-4 h-4 text-amber-500" />,
-      color: 'text-slate-600',
       activeBg: 'bg-amber-50 text-amber-700 font-semibold border border-amber-200/60',
     },
     {
       id: 'COLLEGE',
       label: 'Faculdade',
       icon: <GraduationCap className="w-4 h-4 text-purple-500" />,
-      color: 'text-slate-600',
       activeBg: 'bg-purple-50 text-purple-700 font-semibold border border-purple-200/60',
     },
     {
       id: 'PERSONAL',
       label: 'Pessoais',
       icon: <UserCheck className="w-4 h-4 text-emerald-500" />,
-      color: 'text-slate-600',
       activeBg: 'bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200/60',
     },
   ];
@@ -91,14 +96,14 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-extrabold text-lg tracking-tight text-slate-900">
-                FocusTask
+                BrainBoard
               </span>
               <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">
-                MCP
+                v2.0
               </span>
             </div>
             <p className="text-[11px] text-slate-400 font-medium -mt-0.5">
-              Gestão Inteligente
+              Projetos & Kanban MCP
             </p>
           </div>
         </div>
@@ -106,22 +111,50 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Primary Navigation */}
         <div className="mt-8 space-y-1">
           <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-            Menu Principal
+            Navegação Principal
           </p>
+
+          {/* Portfolio View Button */}
           <button
             onClick={() => {
-              onSelectCategory('ALL');
+              if (onSelectView) onSelectView('PROJECTS');
+              if (onSelectProject) onSelectProject(null);
               setIsMobileMenuOpen(false);
             }}
-            className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-indigo-50 text-indigo-600 font-semibold text-xs transition-colors"
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs transition-colors ${
+              currentView === 'PROJECTS' && !activeProjectId
+                ? 'bg-indigo-50 text-indigo-600 font-semibold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <FolderKanban className="w-4 h-4 text-indigo-600" />
+              <span>Meus Projetos</span>
+            </div>
+            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-100/80 text-indigo-700">
+              {projects.length}
+            </span>
+          </button>
+
+          {/* Kanban Board View Button */}
+          <button
+            onClick={() => {
+              if (onSelectView) onSelectView('BOARD');
+              setIsMobileMenuOpen(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs transition-colors ${
+              currentView === 'BOARD' || activeProjectId
+                ? 'bg-indigo-50 text-indigo-600 font-semibold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium'
+            }`}
           >
             <div className="flex items-center gap-2.5">
               <LayoutGrid className="w-4 h-4 text-indigo-600" />
-              <span>Dashboard</span>
+              <span>Quadro Kanban</span>
             </div>
-            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-100/80 text-indigo-700">
-              {categoryCounts.ALL}
-            </span>
+            {activeProjectId && (
+              <span className="w-2 h-2 rounded-full bg-indigo-500" />
+            )}
           </button>
 
           {staticNavLinks.map((link) => (
@@ -137,19 +170,67 @@ export const Navbar: React.FC<NavbarProps> = ({
           ))}
         </div>
 
-        {/* Category Filters */}
-        <div className="mt-8 space-y-1">
+        {/* Project Switcher List */}
+        {projects.length > 0 && (
+          <div className="mt-6 space-y-1">
+            <div className="flex items-center justify-between px-3 mb-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Projetos Ativos
+              </p>
+              {onOpenCreateProjectModal && (
+                <button
+                  type="button"
+                  onClick={onOpenCreateProjectModal}
+                  aria-label="Criar novo projeto"
+                  className="text-slate-400 hover:text-indigo-600 p-0.5 rounded transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
+              {projects.map((p) => {
+                const isActive = activeProjectId === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      if (onSelectProject) onSelectProject(p.id);
+                      if (onSelectView) onSelectView('BOARD');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all ${
+                      isActive
+                        ? 'bg-indigo-100/70 text-indigo-800 font-semibold'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <Layers className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                      <span className="truncate">{p.title}</span>
+                    </div>
+                    {isActive && <ChevronRight className="w-3.5 h-3.5 shrink-0 text-indigo-600" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Workspaces / Category Filters */}
+        <div className="mt-6 space-y-1">
           <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-            Categorias
+            Workspaces & Categorias
           </p>
           {categoryFilters.map((cat) => {
             const isSelected = selectedCategory === cat.id;
-            const count = categoryCounts[cat.id as keyof typeof categoryCounts] ?? 0;
+            const count = categoryCounts[cat.id] ?? 0;
             return (
               <button
                 key={cat.id}
                 onClick={() => {
-                  onSelectCategory(cat.id);
+                  if (onSelectCategory) onSelectCategory(cat.id);
                   setIsMobileMenuOpen(false);
                 }}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
@@ -196,16 +277,31 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={() => {
-            onOpenCreateModal();
-            setIsMobileMenuOpen(false);
-          }}
-          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-500/20 transition-all transform active:scale-98"
-        >
-          <Plus className="w-4 h-4 stroke-[2.5]" />
-          <span>+ Nova Tarefa</span>
-        </button>
+        <div className="flex flex-col gap-2">
+          {onOpenCreateProjectModal && (
+            <button
+              onClick={() => {
+                onOpenCreateProjectModal();
+                setIsMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl border border-slate-200/80 transition-all transform active:scale-98"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>+ Novo Projeto</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => {
+              onOpenCreateModal();
+              setIsMobileMenuOpen(false);
+            }}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-500/20 transition-all transform active:scale-98"
+          >
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span>+ Nova Tarefa</span>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -223,7 +319,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
             <Brain className="w-4 h-4" />
           </div>
-          <span className="font-extrabold text-base text-slate-900">FocusTask</span>
+          <span className="font-extrabold text-base text-slate-900">BrainBoard</span>
         </div>
 
         <div className="flex items-center gap-2">

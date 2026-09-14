@@ -1,6 +1,6 @@
 import React from 'react';
 import { Layers, PlayCircle, CheckCircle2, ArrowUpRight } from 'lucide-react';
-import { Task } from '../types/task';
+import type { Task } from '../types';
 
 interface DashboardOverviewProps {
   tasks: Task[];

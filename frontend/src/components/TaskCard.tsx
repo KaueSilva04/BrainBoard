@@ -1,23 +1,23 @@
 import React, { useState } from 'react';
 import {
-  FolderKanban,
-  GraduationCap,
-  UserCheck,
+  Clock,
+  PlayCircle,
+  CheckCircle2,
   ArrowRight,
   ArrowLeft,
-  CheckCircle2,
   Trash2,
   Plus,
   Loader2,
-  Clock,
   CheckSquare,
 } from 'lucide-react';
-import { Task, Status, Category, CATEGORY_LABELS } from '../types/task';
+import type { Task, TaskStatus } from '../types';
+import { TASK_STATUS_LABELS } from '../types';
 import { SubtaskItem } from './SubtaskItem';
 
-interface TaskCardProps {
+export interface TaskCardProps {
   task: Task;
-  onMoveTask: (id: string, status: Status) => Promise<void>;
+  stageName?: string;
+  onMoveTask: (id: string, status: TaskStatus) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
   onAddSubtask: (taskId: string, title: string) => Promise<void>;
   onToggleSubtask: (id: string, isDone: boolean) => Promise<void>;
@@ -26,6 +26,7 @@ interface TaskCardProps {
 
 export const TaskCard: React.FC<TaskCardProps> = ({
   task,
+  stageName,
   onMoveTask,
   onDeleteTask,
   onAddSubtask,
@@ -38,32 +39,28 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [showSubtaskForm, setShowSubtaskForm] = useState(false);
 
-  const categoryStyles: Record<
-    Category,
+  const statusConfig: Record<
+    TaskStatus,
     {
       iconBox: string;
       badge: string;
       icon: React.ReactNode;
-      gradient: string;
     }
   > = {
-    PROJECT: {
+    TODO: {
       iconBox: 'bg-amber-50 text-amber-600 border border-amber-200/80',
       badge: 'bg-amber-100/70 text-amber-800 border border-amber-200/80',
-      icon: <FolderKanban className="w-4 h-4" />,
-      gradient: 'from-amber-400 via-orange-500 to-rose-500',
+      icon: <Clock className="w-4 h-4" />,
     },
-    COLLEGE: {
-      iconBox: 'bg-purple-50 text-purple-600 border border-purple-200/80',
-      badge: 'bg-purple-100/70 text-purple-800 border border-purple-200/80',
-      icon: <GraduationCap className="w-4 h-4" />,
-      gradient: 'from-purple-500 via-indigo-500 to-sky-500',
+    IN_PROGRESS: {
+      iconBox: 'bg-indigo-50 text-indigo-600 border border-indigo-200/80',
+      badge: 'bg-indigo-100/70 text-indigo-800 border border-indigo-200/80',
+      icon: <PlayCircle className="w-4 h-4" />,
     },
-    PERSONAL: {
+    DONE: {
       iconBox: 'bg-emerald-50 text-emerald-600 border border-emerald-200/80',
       badge: 'bg-emerald-100/70 text-emerald-800 border border-emerald-200/80',
-      icon: <UserCheck className="w-4 h-4" />,
-      gradient: 'from-teal-400 via-emerald-500 to-green-500',
+      icon: <CheckCircle2 className="w-4 h-4" />,
     },
   };
 
@@ -72,7 +69,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const progressPercent =
     totalSubtasks > 0 ? Math.round((completedSubtasks / totalSubtasks) * 100) : 0;
 
-  const handleMove = async (newStatus: Status) => {
+  const handleMove = async (newStatus: TaskStatus) => {
     if (isMoving) return;
     setIsMoving(true);
     try {
@@ -120,25 +117,32 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       ? '1 dia restante'
       : `${diffDays} dias restantes`;
 
-  const currentCategoryStyle = categoryStyles[task.category] || categoryStyles.PROJECT;
+  const currentStatusConfig = statusConfig[task.status] || statusConfig.TODO;
 
   return (
     <div className="group relative bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-card hover:shadow-card-hover hover:border-indigo-200/90 transition-all duration-200 space-y-4">
-      {/* Top Header: Category Icon Box + Badge & Actions */}
+      {/* Top Header: Status Icon Box + Badge & Actions */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          {/* Category Icon Box (matching reference) */}
+          {/* Status Icon Box */}
           <div
-            className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${currentCategoryStyle.iconBox}`}
+            className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${currentStatusConfig.iconBox}`}
           >
-            {currentCategoryStyle.icon}
+            {currentStatusConfig.icon}
           </div>
           <div>
-            <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${currentCategoryStyle.badge}`}
-            >
-              {CATEGORY_LABELS[task.category]}
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span
+                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${currentStatusConfig.badge}`}
+              >
+                {TASK_STATUS_LABELS[task.status]}
+              </span>
+              {stageName && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                  {stageName}
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5 font-medium">
               <Clock className="w-3 h-3 text-slate-400" />
               <span>{dateDisplay}</span>
@@ -146,7 +150,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           </div>
         </div>
 
-        {/* Delete button (Trash / onDelete) */}
+        {/* Delete button (Trash2 / onDeleteTask) */}
         <button
           onClick={handleDelete}
           disabled={isDeleting}
@@ -226,7 +230,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           </div>
         )}
 
-        {/* Inline Add Subtask Input Form */}
+        {/* Inline Add Subtask Input Form (subtaskTitle / Nova subtarefa) */}
         {showSubtaskForm && (
           <form onSubmit={handleAddSubtask} className="flex items-center gap-1.5 pt-1.5">
             <input

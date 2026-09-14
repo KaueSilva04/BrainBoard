@@ -1,95 +1,227 @@
-import React from 'react';
-import { Task, Status, CategoryFilter } from '../types/task';
+import React, { useState } from 'react';
+import { Plus, Milestone, Columns, Layers } from 'lucide-react';
+import type { Project, Stage, Task, TaskStatus } from '../types';
 import { KanbanColumn } from './KanbanColumn';
+import { StageColumn } from './StageColumn';
 import { DashboardOverview } from './DashboardOverview';
-import { Layers, Plus } from 'lucide-react';
 
-interface KanbanBoardProps {
+export interface KanbanBoardProps {
+  project?: Project | null;
+  stages: Stage[];
   tasks: Task[];
-  selectedCategory: CategoryFilter;
-  onMoveTask: (id: string, status: Status) => Promise<void>;
+  onMoveTask: (id: string, status: TaskStatus) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
   onAddSubtask: (taskId: string, title: string) => Promise<void>;
   onToggleSubtask: (id: string, isDone: boolean) => Promise<void>;
   onDeleteSubtask?: (id: string) => Promise<void>;
-  onOpenCreateModal: () => void;
+  onOpenCreateTask: (stageId?: string) => void;
+  onOpenCreateStage?: () => void;
+  onOpenCreateModal?: () => void;
+  selectedCategory?: string;
 }
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
+  project,
+  stages,
   tasks,
-  selectedCategory,
   onMoveTask,
   onDeleteTask,
   onAddSubtask,
   onToggleSubtask,
   onDeleteSubtask,
+  onOpenCreateTask,
+  onOpenCreateStage,
   onOpenCreateModal,
 }) => {
-  // Apply category filter
-  const filteredTasks = tasks.filter((task) => {
-    if (selectedCategory === 'ALL') return true;
-    return task.category === selectedCategory;
-  });
+  const [boardView, setBoardView] = useState<'STAGES' | 'STATUS'>('STAGES');
 
-  const todoTasks = filteredTasks.filter((t) => t.status === 'TODO');
-  const inProgressTasks = filteredTasks.filter((t) => t.status === 'IN_PROGRESS');
-  const doneTasks = filteredTasks.filter((t) => t.status === 'DONE');
+  const todoTasks = tasks.filter((t) => t.status === 'TODO');
+  const inProgressTasks = tasks.filter((t) => t.status === 'IN_PROGRESS');
+  const doneTasks = tasks.filter((t) => t.status === 'DONE');
+
+  const handleCreateTaskTrigger = (stageId?: string) => {
+    if (onOpenCreateTask) {
+      onOpenCreateTask(stageId);
+    } else if (onOpenCreateModal) {
+      onOpenCreateModal();
+    }
+  };
 
   return (
     <div className="space-y-6">
-      {/* Dashboard Overview Metrics Section (R2) */}
+      {/* Dashboard Overview Metrics Section */}
       <DashboardOverview tasks={tasks} />
 
-      {/* 3-Column Kanban Grid (TODO, IN_PROGRESS, DONE) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <KanbanColumn
-          status="TODO"
-          tasks={todoTasks}
-          onMoveTask={onMoveTask}
-          onDeleteTask={onDeleteTask}
-          onAddSubtask={onAddSubtask}
-          onToggleSubtask={onToggleSubtask}
-          onDeleteSubtask={onDeleteSubtask}
-        />
+      {/* Board Controls / View Mode Toggle */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/80">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80">
+            <button
+              type="button"
+              onClick={() => setBoardView('STAGES')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                boardView === 'STAGES'
+                  ? 'bg-white text-indigo-600 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Milestone className="w-3.5 h-3.5" />
+              <span>Por Etapas ({stages.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setBoardView('STATUS')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                boardView === 'STATUS'
+                  ? 'bg-white text-indigo-600 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Columns className="w-3.5 h-3.5" />
+              <span>Por Status (Kanban)</span>
+            </button>
+          </div>
+        </div>
 
-        <KanbanColumn
-          status="IN_PROGRESS"
-          tasks={inProgressTasks}
-          onMoveTask={onMoveTask}
-          onDeleteTask={onDeleteTask}
-          onAddSubtask={onAddSubtask}
-          onToggleSubtask={onToggleSubtask}
-          onDeleteSubtask={onDeleteSubtask}
-        />
+        <div className="flex items-center gap-2">
+          {onOpenCreateStage && (
+            <button
+              type="button"
+              onClick={onOpenCreateStage}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl shadow-xs transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Nova Etapa</span>
+            </button>
+          )}
 
-        <KanbanColumn
-          status="DONE"
-          tasks={doneTasks}
-          onMoveTask={onMoveTask}
-          onDeleteTask={onDeleteTask}
-          onAddSubtask={onAddSubtask}
-          onToggleSubtask={onToggleSubtask}
-          onDeleteSubtask={onDeleteSubtask}
-        />
+          <button
+            type="button"
+            onClick={() => handleCreateTaskTrigger()}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm shadow-indigo-500/20 transition-all"
+          >
+            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>Nova Tarefa</span>
+          </button>
+        </div>
       </div>
 
-      {/* When total tasks is 0 */}
-      {filteredTasks.length === 0 && tasks.length === 0 && (
-        <div className="text-center py-16 px-4 bg-white rounded-3xl border border-slate-200/80 shadow-card">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center mx-auto mb-3.5">
-            <Layers className="w-7 h-7" />
+      {/* Board Columns View */}
+      {boardView === 'STAGES' ? (
+        stages.length === 0 ? (
+          <div className="text-center py-16 px-4 bg-white rounded-3xl border border-slate-200/80 shadow-card">
+            <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center mx-auto mb-3.5">
+              <Milestone className="w-7 h-7" />
+            </div>
+            <h3 className="text-base font-bold text-slate-800">
+              Nenhuma etapa cadastrada neste projeto
+            </h3>
+            <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+              Crie etapas (milestones) para organizar o fluxo de trabalho e atribuir tarefas a cada fase.
+            </p>
+            {onOpenCreateStage && (
+              <button
+                type="button"
+                onClick={onOpenCreateStage}
+                className="mt-5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-md shadow-indigo-500/20 transition-all inline-flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+                <span>Criar Primeira Etapa</span>
+              </button>
+            )}
           </div>
-          <h3 className="text-base font-bold text-slate-800">
-            Nenhuma tarefa cadastrada ainda
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {stages.map((stage) => {
+              const stageTasks = tasks.filter((t) => t.stageId === stage.id);
+              return (
+                <StageColumn
+                  key={stage.id}
+                  stage={stage}
+                  tasks={stageTasks}
+                  onMoveTask={onMoveTask}
+                  onDeleteTask={onDeleteTask}
+                  onAddSubtask={onAddSubtask}
+                  onToggleSubtask={onToggleSubtask}
+                  onDeleteSubtask={onDeleteSubtask}
+                  onOpenCreateTaskForStage={handleCreateTaskTrigger}
+                />
+              );
+            })}
+
+            {/* Quick Add Stage Column Card */}
+            {onOpenCreateStage && (
+              <div
+                onClick={onOpenCreateStage}
+                className="flex flex-col items-center justify-center min-h-[300px] border-2 border-dashed border-slate-300 hover:border-indigo-400 rounded-2xl bg-slate-50/50 hover:bg-indigo-50/30 p-6 text-center cursor-pointer transition-all group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 group-hover:border-indigo-300 text-slate-400 group-hover:text-indigo-600 flex items-center justify-center transition-colors mb-2">
+                  <Plus className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-700">
+                  Adicionar Nova Etapa
+                </p>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Clique para criar mais um marco no projeto
+                </p>
+              </div>
+            )}
+          </div>
+        )
+      ) : (
+        /* 3-Column Traditional Status Grid (TODO, IN_PROGRESS, DONE) */
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <KanbanColumn
+            status="TODO"
+            tasks={todoTasks}
+            onMoveTask={onMoveTask}
+            onDeleteTask={onDeleteTask}
+            onAddSubtask={onAddSubtask}
+            onToggleSubtask={onToggleSubtask}
+            onDeleteSubtask={onDeleteSubtask}
+          />
+
+          <KanbanColumn
+            status="IN_PROGRESS"
+            tasks={inProgressTasks}
+            onMoveTask={onMoveTask}
+            onDeleteTask={onDeleteTask}
+            onAddSubtask={onAddSubtask}
+            onToggleSubtask={onToggleSubtask}
+            onDeleteSubtask={onDeleteSubtask}
+          />
+
+          <KanbanColumn
+            status="DONE"
+            tasks={doneTasks}
+            onMoveTask={onMoveTask}
+            onDeleteTask={onDeleteTask}
+            onAddSubtask={onAddSubtask}
+            onToggleSubtask={onToggleSubtask}
+            onDeleteSubtask={onDeleteSubtask}
+          />
+        </div>
+      )}
+
+      {/* When total tasks is 0 */}
+      {tasks.length === 0 && (
+        <div className="text-center py-12 px-4 bg-white rounded-3xl border border-slate-200/80 shadow-card mt-6">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center mx-auto mb-3">
+            <Layers className="w-6 h-6" />
+          </div>
+          <h3 className="text-sm font-bold text-slate-800">
+            Nenhuma tarefa cadastrada no momento
           </h3>
           <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-            Comece organizando sua rotina criando sua primeira tarefa no FocusTask.
+            {project
+              ? `Adicione tarefas às etapas do projeto "${project.title}".`
+              : 'Comece organizando sua rotina criando sua primeira tarefa.'}
           </p>
           <button
-            onClick={onOpenCreateModal}
-            className="mt-5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-md shadow-indigo-500/20 transition-all inline-flex items-center gap-1.5"
+            onClick={() => handleCreateTaskTrigger()}
+            className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all inline-flex items-center gap-1.5"
           >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Criar Primeira Tarefa</span>
           </button>
         </div>

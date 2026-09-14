@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Check, Trash2, Loader2 } from 'lucide-react';
-import { Subtask } from '../types/task';
+import type { Subtask } from '../types';
 
 interface SubtaskItemProps {
   subtask: Subtask;
