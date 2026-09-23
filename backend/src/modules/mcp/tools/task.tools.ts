@@ -13,6 +13,7 @@ export const taskToolSchemas: Tool[] = [
         title: { type: 'string', description: 'Título da tarefa.' },
         description: { type: 'string', description: 'Descrição detalhada da tarefa.' },
         status: { type: 'string', enum: ['TODO', 'IN_PROGRESS', 'DONE'], description: 'Status inicial.' },
+        isSprintActive: { type: 'boolean', description: 'Se a tarefa deve ser incluída na Sprint atual ativa.' },
       },
       required: ['stageId', 'title'],
     },
@@ -27,6 +28,7 @@ export const taskToolSchemas: Tool[] = [
         title: { type: 'string', description: 'Título da tarefa.' },
         description: { type: 'string', description: 'Descrição detalhada da tarefa.' },
         status: { type: 'string', enum: ['TODO', 'IN_PROGRESS', 'DONE'], description: 'Status inicial.' },
+        isSprintActive: { type: 'boolean', description: 'Se a tarefa deve ser incluída na Sprint atual ativa.' },
       },
       required: ['stageId', 'title'],
     },
@@ -92,6 +94,7 @@ export const taskToolSchemas: Tool[] = [
         description: { type: 'string', description: 'Nova descrição da tarefa.' },
         status: { type: 'string', enum: ['TODO', 'IN_PROGRESS', 'DONE'], description: 'Novo status.' },
         stageId: { type: 'string', description: 'ID da nova etapa.' },
+        isSprintActive: { type: 'boolean', description: 'Adicionar ou remover da Sprint ativa.' },
       },
       required: ['id'],
     },
@@ -159,6 +162,7 @@ export async function handleTaskTools(name: string, args: any) {
       title,
       description: args?.description ? String(args.description).trim() : null,
       status: args?.status,
+      isSprintActive: args?.isSprintActive !== undefined ? Boolean(args.isSprintActive) : undefined,
     });
 
     return {
@@ -230,6 +234,7 @@ export async function handleTaskTools(name: string, args: any) {
       description: args?.description !== undefined ? (args.description ? String(args.description).trim() : null) : undefined,
       status: args?.status,
       stageId: args?.stageId ? String(args.stageId).trim() : undefined,
+      isSprintActive: args?.isSprintActive !== undefined ? Boolean(args.isSprintActive) : undefined,
     });
 
     return {

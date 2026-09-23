@@ -2,12 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { BookOpen, Plus, Trash2, Calendar, Clock, CheckCircle2, GraduationCap } from 'lucide-react';
 import { academicApi } from '../../services/api';
 import type { AcademicSubject, AcademicAssignment, AssignmentStatus } from '../../types';
+import { CreateSubjectModal } from './CreateSubjectModal';
+import { CreateAssignmentModal } from './CreateAssignmentModal';
 
 export const AcademicView: React.FC = () => {
   const [subjects, setSubjects] = useState<AcademicSubject[]>([]);
   const [assignments, setAssignments] = useState<AcademicAssignment[]>([]);
   const [activeSubjectId, setActiveSubjectId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
+  const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -44,15 +49,14 @@ export const AcademicView: React.FC = () => {
     }
   };
 
-  const handleCreateSubject = async () => {
-    const title = prompt('Nome da Matéria (ex: Cálculo I):');
-    if (!title) return;
+  const handleCreateSubject = async (input: any) => {
     try {
-      const newSub = await academicApi.createSubject({ title });
+      const newSub = await academicApi.createSubject(input);
       setSubjects([...subjects, newSub]);
       setActiveSubjectId(newSub.id);
     } catch (err) {
       console.error(err);
+      throw err;
     }
   };
 
@@ -67,21 +71,19 @@ export const AcademicView: React.FC = () => {
     }
   };
 
-  const handleCreateAssignment = async () => {
+  const handleCreateAssignment = async (input: any) => {
     if (!activeSubjectId) return;
-    const title = prompt('O que você precisa fazer? (ex: Estudar para P1, Lista de Exercícios)');
-    if (!title) return;
     
     try {
       await academicApi.createAssignment({
-        title,
+        ...input,
         subjectId: activeSubjectId,
-        type: 'HOMEWORK',
         status: 'TODO'
       });
       loadAssignments(activeSubjectId);
     } catch (err) {
       console.error(err);
+      throw err;
     }
   };
 
@@ -121,7 +123,7 @@ export const AcademicView: React.FC = () => {
             Matérias
           </h2>
           <button 
-            onClick={handleCreateSubject}
+            onClick={() => setIsSubjectModalOpen(true)}
             className="p-1 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors"
           >
             <Plus className="w-4 h-4" />
@@ -179,7 +181,7 @@ export const AcademicView: React.FC = () => {
                   <p className="text-sm text-slate-500 mt-1">Gerencie suas provas, trabalhos e tarefas desta matéria.</p>
                 </div>
                 <button
-                  onClick={handleCreateAssignment}
+                  onClick={() => setIsAssignmentModalOpen(true)}
                   className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-all"
                 >
                   <Plus className="w-4 h-4" />
@@ -265,6 +267,16 @@ export const AcademicView: React.FC = () => {
           </div>
         )}
       </div>
+      <CreateSubjectModal
+        isOpen={isSubjectModalOpen}
+        onClose={() => setIsSubjectModalOpen(false)}
+        onCreateSubject={handleCreateSubject}
+      />
+      <CreateAssignmentModal
+        isOpen={isAssignmentModalOpen}
+        onClose={() => setIsAssignmentModalOpen(false)}
+        onCreateAssignment={handleCreateAssignment}
+      />
     </div>
   );
 };

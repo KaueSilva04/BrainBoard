@@ -135,7 +135,7 @@ Se o Codex ou a IA estiver fora da rede local (ex: VM remota, cloud runner):
 
 ---
 
-## 3. 🛠️ Catálogo Completo das 15 Ferramentas MCP
+## 3. 🛠️ Catálogo de Ferramentas MCP
 
 ### 📌 Gestão de Projetos e Contexto
 
@@ -234,6 +234,32 @@ Marca ou desmarca uma subtarefa como concluída.
 Exclui uma subtarefa específica do checklist.
 * **Argumentos:**
   * `id` *(string, obrigatório)*: UUID da subtarefa.
+
+---
+
+### 📅 Produtividade e Calendário (M2)
+
+#### 14. `create_appointment`
+Cria um novo compromisso com horário de início e término no calendário.
+* **Argumentos:**
+  * `title` *(string, obrigatório)*: Título do compromisso.
+  * `startTime` *(string, obrigatório)*: Data/hora de início (ISO-8601).
+  * `endTime` *(string, obrigatório)*: Data/hora de término (ISO-8601).
+  * `description` *(string, opcional)*: Descrição detalhada.
+  * `locationOrLink` *(string, opcional)*: Local físico ou link da reunião.
+
+#### 15. `list_upcoming_deadlines`
+Consulta prazos, entregas e compromissos futuros.
+* **Argumentos:**
+  * `days` *(number, opcional)*: Número de dias à frente (padrão: 7).
+  * `projectId` *(string, opcional)*: Filtrar por projeto.
+  * `includeCompleted` *(boolean, opcional)*: Incluir itens concluídos.
+
+#### 16. `add_to_sprint`
+Adiciona ou remove uma tarefa da Sprint ativa. (Usa a flag `isSprintActive` simplificada)
+* **Argumentos:**
+  * `taskId` *(string, obrigatório)*: UUID da tarefa.
+  * `isSprintActive` *(boolean, opcional)*: `true` para adicionar, `false` para remover (padrão: `true`).
 
 ---
 
