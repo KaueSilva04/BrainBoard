@@ -3,6 +3,15 @@ import { academicService } from './academic.service.js';
 import { ValidationError, NotFoundError } from '../shared/errors.js';
 
 // --- SUBJECTS ---
+export const listSubjects = async (req: Request, res: Response) => {
+  try {
+    const subjects = await academicService.listSubjects();
+    res.json(subjects);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 export const createSubject = async (req: Request, res: Response) => {
   try {
     const subject = await academicService.createSubject(req.body);
@@ -37,6 +46,16 @@ export const deleteSubject = async (req: Request, res: Response) => {
 };
 
 // --- ASSIGNMENTS ---
+export const listAssignments = async (req: Request, res: Response) => {
+  try {
+    const subjectId = req.query.subjectId ? String(req.query.subjectId) : undefined;
+    const assignments = await academicService.listAssignments(subjectId);
+    res.json(assignments);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 export const createAssignment = async (req: Request, res: Response) => {
   try {
     const assignment = await academicService.createAssignment(req.body);

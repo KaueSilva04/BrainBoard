@@ -10,6 +10,13 @@ import type {
 
 export class AcademicService {
   // --- SUBJECTS ---
+  async listSubjects() {
+    return prisma.academicSubject.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: { assignments: true },
+    });
+  }
+
   async createSubject(data: CreateAcademicSubjectInput) {
     if (!data.title?.trim()) throw new ValidationError('Title is required');
 
@@ -52,6 +59,13 @@ export class AcademicService {
   }
 
   // --- ASSIGNMENTS ---
+  async listAssignments(subjectId?: string) {
+    return prisma.academicAssignment.findMany({
+      where: subjectId ? { subjectId } : undefined,
+      orderBy: { dueDate: 'asc' },
+    });
+  }
+
   async createAssignment(data: CreateAcademicAssignmentInput) {
     if (!data.subjectId) throw new ValidationError('subjectId is required');
     if (!data.title?.trim()) throw new ValidationError('Title is required');
