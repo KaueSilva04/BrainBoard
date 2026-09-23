@@ -8,6 +8,7 @@ export interface ProjectListProps {
   onSelectProject: (id: string) => void;
   onOpenCreateProjectModal: () => void;
   searchQuery?: string;
+  onDeleteProject?: (id: string, title: string) => void;
 }
 
 export const ProjectList: React.FC<ProjectListProps> = ({
@@ -15,6 +16,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
   onSelectProject,
   onOpenCreateProjectModal,
   searchQuery = '',
+  onDeleteProject,
 }) => {
   const filteredProjects = projects.filter((p) => {
     if (!searchQuery.trim()) return true;
@@ -81,6 +83,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
               key={project.id}
               project={project}
               onClick={onSelectProject}
+              onDelete={onDeleteProject}
             />
           ))}
         </div>

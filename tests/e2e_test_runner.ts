@@ -2,8 +2,8 @@
  * BrainBoard V2 End-to-End Test Runner (e2e_test_runner.ts)
  * 
  * Comprehensive 4-Tier Automated Verification Harness for BrainBoard V2:
- * - Tier 1: Feature Coverage (REST CRUD Projects/Stages/Logs/Members/Tasks/Subtasks, Real MCP SSE Tools, Docker)
- * - Tier 2: Boundary & Corner Cases (Empty titles 400, Unbounded text stress, SQLi/XSS/UTF-8 fidelity, UUID 404, Invalid Enums 400, JSON settings, Member validation)
+ * - Tier 1: Feature Coverage (REST CRUD Projects/Stages/Logs/Members/Tasks/Subtasks/Appointments, Real MCP SSE Tools, Docker)
+ * - Tier 2: Boundary & Corner Cases (Empty titles 400, Unbounded text stress, SQLi/XSS/UTF-8 fidelity, UUID 404, Invalid Enums 400, JSON settings, Member validation, Appointment date boundaries)
  * - Tier 3: Cascade Deletion & Dual Interface Synchronization (Project cascade, Stage cascade, Task cascade, Dual REST/MCP sync, Multi-stage task isolation)
  * - Tier 4: Real-World Scenarios (Autonomous AI SDLC Lifecycle, Agile Milestone Delivery, Audit Trail & Governance)
  * 
@@ -463,7 +463,7 @@ async function executeTestSuite() {
   // =========================================================================
   // TIER 1: FEATURE COVERAGE
   // =========================================================================
-  console.log(`${colors.magenta}${colors.bright}--- TIER 1: FEATURE COVERAGE (Projects, Stages, Logs, Members, Tasks, Subtasks, MCP, Docker) ---${colors.reset}`);
+  console.log(`${colors.magenta}${colors.bright}--- TIER 1: FEATURE COVERAGE (Projects, Stages, Logs, Members, Tasks, Subtasks, Appointments, MCP, Docker) ---${colors.reset}`);
 
   // 1. Projects REST
   let tier1ProjectId = '';
@@ -756,7 +756,95 @@ async function executeTestSuite() {
     }
   }, 'REST_SUBTASK');
 
-  // 7. MCP SSE Protocol & Tools
+  // 7. Appointments REST CRUD
+  let tier1AppointmentId = '';
+  await runTest('T1-APT-01', 1, 'REST POST /api/appointments - Appointment Creation with Time Window', async () => {
+    const calendarPath = path.join(targetWorkspace, 'backend/src/modules/calendar/calendar.router.ts');
+    const calendarRouterContent = fs.existsSync(calendarPath) ? fs.readFileSync(calendarPath, 'utf-8') : '';
+    const indexContent = getBackendIndex();
+    assert(
+      calendarRouterContent.includes('/api/appointments') || indexContent.includes('/api/appointments'),
+      'Must register POST /api/appointments route'
+    );
+
+    if (serverUp) {
+      const startTime = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+      const endTime = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000).toISOString();
+      const payload = {
+        title: 'E2E Test Architecture Review',
+        description: 'Verify appointment CRUD and calendar projection',
+        startTime,
+        endTime,
+        locationOrLink: 'https://meet.brainboard.io/e2e',
+      };
+      const res = await makeRequest('POST', '/api/appointments', payload);
+      assert(res.status === 201, `Expected 201 Created, got ${res.status}: ${res.raw}`);
+      assert(res.data && res.data.id, 'Appointment must return UUID');
+      assertEqual(res.data.title, payload.title, 'Title must match');
+      assertEqual(res.data.isCompleted, false, 'New appointment isCompleted must default to false');
+      tier1AppointmentId = res.data.id;
+    } else {
+      const schema = getSchema();
+      assertIncludes(schema, 'model Appointment {', 'Schema must define Appointment model');
+    }
+  }, 'REST_APPOINTMENT');
+
+  await runTest('T1-APT-02', 1, 'REST GET /api/appointments, GET /:id & PATCH /:id - Details and Completion Toggle', async () => {
+    const calendarPath = path.join(targetWorkspace, 'backend/src/modules/calendar/calendar.router.ts');
+    const calendarRouterContent = fs.existsSync(calendarPath) ? fs.readFileSync(calendarPath, 'utf-8') : '';
+    const indexContent = getBackendIndex();
+    assert(
+      calendarRouterContent.includes('/api/appointments') || indexContent.includes('/api/appointments'),
+      'Must register appointment routes'
+    );
+
+    if (serverUp && tier1AppointmentId) {
+      const listRes = await makeRequest('GET', '/api/appointments');
+      assert(listRes.status === 200, `Expected 200 OK, got ${listRes.status}`);
+      assert(listRes.data.some((a: any) => a.id === tier1AppointmentId), 'Created appointment must be in list');
+
+      const filterRes = await makeRequest('GET', '/api/appointments?isCompleted=false');
+      assert(filterRes.status === 200, `Expected 200 OK, got ${filterRes.status}`);
+      assert(filterRes.data.some((a: any) => a.id === tier1AppointmentId), 'Uncompleted appointment must be in filtered list');
+
+      const detailRes = await makeRequest('GET', `/api/appointments/${tier1AppointmentId}`);
+      assert(detailRes.status === 200, `Expected 200 OK, got ${detailRes.status}`);
+      assertEqual(detailRes.data.id, tier1AppointmentId, 'Appointment ID must match');
+
+      const patchRes = await makeRequest('PATCH', `/api/appointments/${tier1AppointmentId}`, {
+        isCompleted: true,
+        description: 'Updated architecture review session notes',
+      });
+      assert(patchRes.status === 200, `Expected 200 OK, got ${patchRes.status}`);
+      assertEqual(patchRes.data.isCompleted, true, 'isCompleted must be toggled to true');
+      assertEqual(patchRes.data.description, 'Updated architecture review session notes', 'Description updated');
+
+      const filterCompletedRes = await makeRequest('GET', '/api/appointments?isCompleted=true');
+      assert(filterCompletedRes.status === 200, `Expected 200 OK, got ${filterCompletedRes.status}`);
+      assert(filterCompletedRes.data.some((a: any) => a.id === tier1AppointmentId), 'Completed appointment must be in completed list');
+    } else {
+      const apptServicePath = path.join(targetWorkspace, 'backend/src/modules/calendar/appointment.service.ts');
+      const content = fs.existsSync(apptServicePath) ? fs.readFileSync(apptServicePath, 'utf-8') : '';
+      assert(content.includes('listAppointments') && content.includes('updateAppointment'), 'appointment.service.ts must export listAppointments and updateAppointment');
+    }
+  }, 'REST_APPOINTMENT');
+
+  await runTest('T1-APT-03', 1, 'REST DELETE /api/appointments/:id - Appointment Deletion', async () => {
+    if (serverUp && tier1AppointmentId) {
+      const delRes = await makeRequest('DELETE', `/api/appointments/${tier1AppointmentId}`);
+      assert(delRes.status === 204 || delRes.status === 200, `Expected 204 No Content, got ${delRes.status}`);
+
+      const checkRes = await makeRequest('GET', `/api/appointments/${tier1AppointmentId}`);
+      assertEqual(checkRes.status, 404, 'Deleted appointment must return 404');
+      tier1AppointmentId = '';
+    } else {
+      const apptServicePath = path.join(targetWorkspace, 'backend/src/modules/calendar/appointment.service.ts');
+      const content = fs.existsSync(apptServicePath) ? fs.readFileSync(apptServicePath, 'utf-8') : '';
+      assert(content.includes('deleteAppointment'), 'appointment.service.ts must export deleteAppointment');
+    }
+  }, 'REST_APPOINTMENT');
+
+  // 8. MCP SSE Protocol & Tools
   let mcpClient: McpSseClient | null = activeMcpClient;
 
   await runTest('T1-MCP-01', 1, 'MCP Real SSE Connection & Session Handshake', async () => {
@@ -774,7 +862,7 @@ async function executeTestSuite() {
     }
   }, 'MCP_SSE');
 
-  await runTest('T1-MCP-02', 1, 'MCP tools/list Schema Discovery (All 15 Tools Verified)', async () => {
+  await runTest('T1-MCP-02', 1, 'MCP tools/list Schema Discovery (All 18 Tools Verified)', async () => {
     const content = getBackendIndex();
     const requiredTools = [
       'read_project_context',
@@ -792,6 +880,9 @@ async function executeTestSuite() {
       'delete_subtask',
       'list_tasks',
       'get_task',
+      'create_appointment',
+      'list_upcoming_deadlines',
+      'add_to_sprint',
     ];
 
     for (const t of requiredTools) {
@@ -801,7 +892,7 @@ async function executeTestSuite() {
     if (serverUp && mcpClient) {
       const tools = await mcpClient.listTools();
       assert(Array.isArray(tools), 'tools/list must return array');
-      assert(tools.length >= 15, `Expected at least 15 tools registered, got ${tools.length}`);
+      assert(tools.length >= 18, `Expected at least 18 tools registered, got ${tools.length}`);
       const toolNames = tools.map((t: any) => t.name);
       for (const required of requiredTools) {
         assert(toolNames.includes(required), `Registered tools list must contain ${required}`);
@@ -918,7 +1009,101 @@ async function executeTestSuite() {
     }
   }, 'MCP_EXEC');
 
-  // 8. Docker Configuration Contracts
+  let mcpAppointmentId = '';
+  await runTest('T1-MCP-08', 1, 'MCP create_appointment Tool Invocation Over SSE', async () => {
+    const content = getBackendIndex();
+    assert(
+      content.includes('create_appointment'),
+      "MCP registration for 'create_appointment' must exist in backend/src/index.ts"
+    );
+
+    if (serverUp && mcpClient) {
+      const startTime = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+      const endTime = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000 + 45 * 60 * 1000).toISOString();
+      const res = await mcpClient.callTool('create_appointment', {
+        title: 'MCP Autonomous Calendar Event',
+        startTime,
+        endTime,
+        description: 'Scheduled autonomously by AI test harness',
+      });
+      assert(res && res.content && res.content[0]?.text, 'Tool call must return text content');
+      const text = res.content[0].text;
+      assertIncludes(text, 'Compromisso agendado com sucesso', 'Expected confirmation string');
+      mcpAppointmentId = text.split('sucesso: ')[1].split(' — ')[0].trim();
+
+      // Verify DB via REST
+      const verifyRes = await makeRequest('GET', `/api/appointments/${mcpAppointmentId}`);
+      assertEqual(verifyRes.status, 200, 'Appointment created by MCP must be readable via REST');
+      assertEqual(verifyRes.data.title, 'MCP Autonomous Calendar Event', 'Title must match');
+
+      // Cleanup
+      await makeRequest('DELETE', `/api/appointments/${mcpAppointmentId}`);
+    } else {
+      const m2ToolsPath = path.join(targetWorkspace, 'backend/src/modules/mcp/tools/m2.tools.ts');
+      const m2Content = fs.existsSync(m2ToolsPath) ? fs.readFileSync(m2ToolsPath, 'utf-8') : '';
+      assert(m2Content.includes('create_appointment'), 'm2.tools.ts must implement create_appointment');
+    }
+  }, 'MCP_EXEC');
+
+  await runTest('T1-MCP-09', 1, 'MCP list_upcoming_deadlines Tool Invocation Over SSE', async () => {
+    const content = getBackendIndex();
+    assert(
+      content.includes('list_upcoming_deadlines'),
+      "MCP registration for 'list_upcoming_deadlines' must exist in backend/src/index.ts"
+    );
+
+    if (serverUp && mcpClient) {
+      const res = await mcpClient.callTool('list_upcoming_deadlines', { days: 14 });
+      assert(res && res.content && res.content[0]?.text, 'Tool call must return JSON text');
+      const parsed = JSON.parse(res.content[0].text);
+      assert(typeof parsed.totalUpcoming === 'number', 'Result must include totalUpcoming number');
+      assert(Array.isArray(parsed.deadlines), 'Result must include deadlines array');
+      assert(Array.isArray(parsed.appointments), 'Result must include appointments array');
+      assert(parsed.queryWindow && parsed.queryWindow.days === 14, 'queryWindow must match requested days');
+    } else {
+      const m2ToolsPath = path.join(targetWorkspace, 'backend/src/modules/mcp/tools/m2.tools.ts');
+      const m2Content = fs.existsSync(m2ToolsPath) ? fs.readFileSync(m2ToolsPath, 'utf-8') : '';
+      assert(m2Content.includes('list_upcoming_deadlines'), 'm2.tools.ts must implement list_upcoming_deadlines');
+    }
+  }, 'MCP_EXEC');
+
+  await runTest('T1-MCP-10', 1, 'MCP add_to_sprint Tool Invocation Over SSE', async () => {
+    const content = getBackendIndex();
+    assert(
+      content.includes('add_to_sprint'),
+      "MCP registration for 'add_to_sprint' must exist in backend/src/index.ts"
+    );
+
+    if (serverUp && mcpClient && tier1TaskId) {
+      // Add to sprint
+      const addRes = await mcpClient.callTool('add_to_sprint', {
+        taskId: tier1TaskId,
+        isSprintActive: true,
+      });
+      assert(addRes && addRes.content, 'Tool call must return content');
+      assertIncludes(addRes.content[0].text, 'adicionada à Sprint ativa', 'Confirmation message expected');
+
+      // Verify via REST
+      const check1 = await makeRequest('GET', `/api/tasks/${tier1TaskId}`);
+      assertEqual(check1.data.isSprintActive, true, 'Task isSprintActive must be true in database');
+
+      // Remove from sprint
+      const removeRes = await mcpClient.callTool('add_to_sprint', {
+        taskId: tier1TaskId,
+        isSprintActive: false,
+      });
+      assertIncludes(removeRes.content[0].text, 'removida da Sprint ativa', 'Removal message expected');
+
+      const check2 = await makeRequest('GET', `/api/tasks/${tier1TaskId}`);
+      assertEqual(check2.data.isSprintActive, false, 'Task isSprintActive must be false in database');
+    } else {
+      const m2ToolsPath = path.join(targetWorkspace, 'backend/src/modules/mcp/tools/m2.tools.ts');
+      const m2Content = fs.existsSync(m2ToolsPath) ? fs.readFileSync(m2ToolsPath, 'utf-8') : '';
+      assert(m2Content.includes('add_to_sprint'), 'm2.tools.ts must implement add_to_sprint');
+    }
+  }, 'MCP_EXEC');
+
+  // 9. Docker Configuration Contracts
   await runTest('T1-DOC-01', 1, 'Backend Dockerfile Directives and Prisma Generate', () => {
     const dockerfilePath = path.join(targetWorkspace, 'backend/Dockerfile');
     assert(fs.existsSync(dockerfilePath), `Backend Dockerfile must exist at ${dockerfilePath}`);
@@ -952,13 +1137,23 @@ async function executeTestSuite() {
     const content = fs.readFileSync(nginxPath, 'utf-8');
     assertIncludes(content, 'proxy_pass', 'nginx.conf must configure proxy_pass for /api/');
     assertIncludes(content, 'try_files $uri $uri/ /index.html', 'nginx.conf must configure SPA fallback');
+    assertIncludes(content, 'proxy_buffering off', 'nginx.conf must configure proxy_buffering off for MCP SSE');
+    assertIncludes(content, "proxy_set_header Connection ''", 'nginx.conf must clear Connection header for MCP SSE');
+    assertIncludes(content, 'proxy_read_timeout 86400s', 'nginx.conf must configure long read timeout for MCP SSE');
   }, 'DOCKER_CONFIG');
 
   // Tier 1 cleanup
-  if (serverUp && tier1ProjectId) {
-    try {
-      await makeRequest('DELETE', `/api/projects/${tier1ProjectId}`);
-    } catch {}
+  if (serverUp) {
+    if (tier1AppointmentId) {
+      try {
+        await makeRequest('DELETE', `/api/appointments/${tier1AppointmentId}`);
+      } catch {}
+    }
+    if (tier1ProjectId) {
+      try {
+        await makeRequest('DELETE', `/api/projects/${tier1ProjectId}`);
+      } catch {}
+    }
   }
 
   // =========================================================================
@@ -1183,6 +1378,36 @@ async function executeTestSuite() {
     } else {
       const schema = getSchema();
       assertIncludes(schema, 'email     String?', 'Member model must support optional email');
+    }
+  });
+
+  await runTest('T2-BND-08', 2, 'Appointment Inverted Dates (startTime >= endTime) Rejected with 400 Bad Request', async () => {
+    if (serverUp) {
+      const now = new Date();
+      const past = new Date(now.getTime() - 3600000);
+      const res = await makeRequest('POST', '/api/appointments', {
+        title: 'Invalid Appointment Inverted Dates',
+        startTime: now.toISOString(),
+        endTime: past.toISOString(),
+      });
+      assert(res.status === 400, `Expected 400 for inverted appointment dates, got ${res.status}`);
+
+      const resEmpty = await makeRequest('POST', '/api/appointments', {
+        title: '   ',
+        startTime: now.toISOString(),
+        endTime: new Date(now.getTime() + 3600000).toISOString(),
+      });
+      assert(resEmpty.status === 400, `Expected 400 for whitespace-only appointment title, got ${resEmpty.status}`);
+
+      const resNotFound = await makeRequest('GET', '/api/appointments/00000000-0000-0000-0000-000000000000');
+      assert(resNotFound.status === 404, `Expected 404 for non-existent appointment UUID, got ${resNotFound.status}`);
+    } else {
+      const apptServicePath = path.join(targetWorkspace, 'backend/src/modules/calendar/appointment.service.ts');
+      const content = fs.existsSync(apptServicePath) ? fs.readFileSync(apptServicePath, 'utf-8') : '';
+      assert(
+        content.includes('startTime.getTime() >= endTime.getTime()'),
+        'appointment.service.ts must validate that startTime is before endTime'
+      );
     }
   });
 

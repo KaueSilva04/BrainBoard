@@ -10,9 +10,19 @@ import type {
   UpdateProjectInput,
   CreateStageInput,
   CreateTaskInput,
+  UpdateTaskInput,
   CreateMemberInput,
   CreateUpdateLogInput,
   TaskStatus,
+  Appointment,
+  CreateAppointmentInput,
+  UpdateAppointmentInput,
+  CalendarEventProjection,
+  AcademicSubject,
+  CreateAcademicSubjectInput,
+  AcademicDeadlineItem,
+  CreateAcademicDeadlineInput,
+  UpdateAcademicDeadlineInput,
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
@@ -144,9 +154,31 @@ export const tasksApi = {
     return request(`/api/stages/${stageId}/tasks`);
   },
 
+  listAll(filters?: {
+    isSprintActive?: boolean;
+    status?: TaskStatus;
+    hasDueDate?: boolean;
+    stageId?: string;
+  }): Promise<Task[]> {
+    const params = new URLSearchParams();
+    if (filters?.isSprintActive !== undefined) params.set('isSprintActive', String(filters.isSprintActive));
+    if (filters?.status) params.set('status', filters.status);
+    if (filters?.hasDueDate !== undefined) params.set('hasDueDate', String(filters.hasDueDate));
+    if (filters?.stageId) params.set('stageId', filters.stageId);
+    const qs = params.toString();
+    return request(`/api/tasks${qs ? `?${qs}` : ''}`);
+  },
+
   create(stageId: string, input: CreateTaskInput): Promise<Task> {
     return request(`/api/stages/${stageId}/tasks`, {
       method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  update(id: string, input: UpdateTaskInput): Promise<Task> {
+    return request(`/api/tasks/${id}`, {
+      method: 'PATCH',
       body: JSON.stringify(input),
     });
   },
@@ -155,6 +187,13 @@ export const tasksApi = {
     return request(`/api/tasks/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
+    });
+  },
+
+  toggleSprint(id: string, isSprintActive: boolean): Promise<Task> {
+    return request(`/api/tasks/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isSprintActive }),
     });
   },
 
@@ -222,5 +261,119 @@ export const updateLogsApi = {
     return request(`/api/projects/${projectId}/update-logs/${logId}`, {
       method: 'DELETE',
     });
+  },
+};
+
+// ============================================================
+// Appointments API
+// ============================================================
+export const appointmentsApi = {
+  list(filters?: { startDate?: string; endDate?: string; isCompleted?: boolean }): Promise<Appointment[]> {
+    const params = new URLSearchParams();
+    if (filters?.startDate) params.set('startDate', filters.startDate);
+    if (filters?.endDate) params.set('endDate', filters.endDate);
+    if (filters?.isCompleted !== undefined) params.set('isCompleted', String(filters.isCompleted));
+    const qs = params.toString();
+    return request(`/api/appointments${qs ? `?${qs}` : ''}`);
+  },
+
+  get(id: string): Promise<Appointment> {
+    return request(`/api/appointments/${id}`);
+  },
+
+  create(input: CreateAppointmentInput): Promise<Appointment> {
+    return request('/api/appointments', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  update(id: string, input: UpdateAppointmentInput): Promise<Appointment> {
+    return request(`/api/appointments/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    });
+  },
+
+  toggleCompleted(id: string, isCompleted: boolean): Promise<Appointment> {
+    return request(`/api/appointments/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isCompleted }),
+    });
+  },
+
+  delete(id: string): Promise<void> {
+    return request(`/api/appointments/${id}`, { method: 'DELETE' });
+  },
+};
+
+// ============================================================
+// Calendar API
+// ============================================================
+export const calendarApi = {
+  getEvents(filters?: {
+    startDate?: string;
+    endDate?: string;
+    includeCompleted?: boolean;
+    projectId?: string;
+  }): Promise<CalendarEventProjection[]> {
+    const params = new URLSearchParams();
+    if (filters?.startDate) params.set('startDate', filters.startDate);
+    if (filters?.endDate) params.set('endDate', filters.endDate);
+    if (filters?.includeCompleted !== undefined) params.set('includeCompleted', String(filters.includeCompleted));
+    if (filters?.projectId) params.set('projectId', filters.projectId);
+    const qs = params.toString();
+    return request(`/api/calendar/events${qs ? `?${qs}` : ''}`);
+  },
+};
+
+// ============================================================
+// Academic API
+// ============================================================
+export const academicApi = {
+  listSubjects(): Promise<AcademicSubject[]> {
+    return request('/api/academic/subjects');
+  },
+
+  getSubject(id: string): Promise<AcademicSubject> {
+    return request(`/api/academic/subjects/${id}`);
+  },
+
+  createSubject(input: CreateAcademicSubjectInput): Promise<AcademicSubject> {
+    return request('/api/academic/subjects', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  listDeadlines(filters?: {
+    projectId?: string;
+    includeCompleted?: boolean;
+    days?: number;
+  }): Promise<AcademicDeadlineItem[]> {
+    const params = new URLSearchParams();
+    if (filters?.projectId) params.set('projectId', filters.projectId);
+    if (filters?.includeCompleted !== undefined) params.set('includeCompleted', String(filters.includeCompleted));
+    if (filters?.days) params.set('days', String(filters.days));
+    const qs = params.toString();
+    return request(`/api/academic/deadlines${qs ? `?${qs}` : ''}`);
+  },
+
+  createDeadline(input: CreateAcademicDeadlineInput): Promise<AcademicDeadlineItem> {
+    return request('/api/academic/deadlines', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  updateDeadline(id: string, input: UpdateAcademicDeadlineInput): Promise<AcademicDeadlineItem> {
+    return request(`/api/academic/deadlines/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    });
+  },
+
+  deleteDeadline(id: string): Promise<void> {
+    return request(`/api/academic/deadlines/${id}`, { method: 'DELETE' });
   },
 };

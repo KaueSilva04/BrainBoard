@@ -15,9 +15,9 @@ RUN npm install
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Copy source code and tsconfig
 COPY tsconfig.json ./
 COPY src ./src
+COPY MCP_DOCUMENTATION.md* ./
 
 # Expose backend port
 EXPOSE 3000

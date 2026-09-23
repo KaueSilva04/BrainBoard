@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Milestone, Columns, Layers } from 'lucide-react';
+import { Plus, Milestone, Layers } from 'lucide-react';
 import type { Project, Stage, Task, TaskStatus } from '../types';
 import { KanbanColumn } from './KanbanColumn';
 import { StageColumn } from './StageColumn';
@@ -33,11 +33,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onOpenCreateStage,
   onOpenCreateModal,
 }) => {
-  const [boardView, setBoardView] = useState<'STAGES' | 'STATUS'>('STAGES');
+  const [boardView, setBoardView] = useState<'STAGES' | 'STATUS'>('STATUS');
+  const [filterMode, setFilterMode] = useState<'ALL' | 'SPRINT'>('ALL');
 
-  const todoTasks = tasks.filter((t) => t.status === 'TODO');
-  const inProgressTasks = tasks.filter((t) => t.status === 'IN_PROGRESS');
-  const doneTasks = tasks.filter((t) => t.status === 'DONE');
+  const displayedTasks = filterMode === 'SPRINT' ? tasks.filter(t => t.isSprintActive) : tasks;
+
+  const todoTasks = displayedTasks.filter((t) => t.status === 'TODO');
+  const inProgressTasks = displayedTasks.filter((t) => t.status === 'IN_PROGRESS');
+  const doneTasks = displayedTasks.filter((t) => t.status === 'DONE');
 
   const handleCreateTaskTrigger = (stageId?: string) => {
     if (onOpenCreateTask) {
@@ -48,57 +51,76 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 flex flex-col h-full">
       {/* Dashboard Overview Metrics Section */}
       <DashboardOverview tasks={tasks} />
 
-      {/* Board Controls / View Mode Toggle */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/80">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80">
+      {/* Modern Professional Board Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
+        <div className="flex items-center gap-4 flex-wrap">
+          
+          {/* Scope Filter: All vs Sprint */}
+          <div className="flex items-center bg-slate-100/80 p-1 rounded-lg border border-slate-200/60 shadow-inner">
             <button
               type="button"
-              onClick={() => setBoardView('STAGES')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                boardView === 'STAGES'
-                  ? 'bg-white text-indigo-600 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+              onClick={() => setFilterMode('ALL')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                filterMode === 'ALL'
+                  ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50'
+                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Backlog do Projeto</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterMode('SPRINT')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                filterMode === 'SPRINT'
+                  ? 'bg-white text-indigo-700 shadow-sm border border-slate-200/50'
+                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
               }`}
             >
               <Milestone className="w-3.5 h-3.5" />
-              <span>Por Etapas ({stages.length})</span>
+              <span>Sprint Ativa</span>
+              {filterMode !== 'SPRINT' && tasks.filter(t => t.isSprintActive).length > 0 && (
+                <span className="ml-1 w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+              )}
             </button>
-            <button
-              type="button"
-              onClick={() => setBoardView('STATUS')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                boardView === 'STATUS'
-                  ? 'bg-white text-indigo-600 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+          </div>
+
+          <div className="w-px h-5 bg-slate-200 hidden sm:block" />
+
+          {/* Grouping Toggle */}
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+            <span className="hidden sm:inline">Agrupar por:</span>
+            <select
+              value={boardView}
+              onChange={(e) => setBoardView(e.target.value as 'STAGES' | 'STATUS')}
+              className="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer shadow-sm"
             >
-              <Columns className="w-3.5 h-3.5" />
-              <span>Por Status (Kanban)</span>
-            </button>
+              <option value="STATUS">Status (Kanban)</option>
+              <option value="STAGES">Etapas ({stages.length})</option>
+            </select>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {onOpenCreateStage && (
             <button
               type="button"
               onClick={onOpenCreateStage}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl shadow-xs transition-colors"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-sm transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Nova Etapa</span>
+              <span>Etapa</span>
             </button>
           )}
-
           <button
             type="button"
             onClick={() => handleCreateTaskTrigger()}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm shadow-indigo-500/20 transition-all"
+            className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-sm shadow-indigo-500/20 transition-all"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Nova Tarefa</span>
@@ -133,7 +155,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {stages.map((stage) => {
-              const stageTasks = tasks.filter((t) => t.stageId === stage.id);
+              const stageTasks = displayedTasks.filter((t) => t.stageId === stage.id);
               return (
                 <StageColumn
                   key={stage.id}

@@ -13,6 +13,12 @@ enum ProjectStatus {
   COMPLETED
 }
 
+enum SprintStatus {
+  PLANNING
+  ACTIVE
+  COMPLETED
+}
+
 enum StageStatus {
   PLANNING
   IN_PROGRESS
@@ -25,12 +31,18 @@ enum Status {
   DONE
 }
 
+enum ProjectType {
+  SOFTWARE
+  ACADEMIC
+}
+
 model Project {
   id            String        @id @default(uuid())
   title         String
   description   String?
-  businessLogic String?       @db.Text
+  businessLogic String?  @db.Text
   status        ProjectStatus @default(PLANNING)
+  type          ProjectType   @default(SOFTWARE)
   githubRepo    String?
   settings      Json?
   createdAt     DateTime      @default(now())
@@ -39,12 +51,27 @@ model Project {
   stages     Stage[]
   updateLogs UpdateLog[]
   members    Member[]
+  sprints    Sprint[]
+}
+
+model Sprint {
+  id          String       @id @default(uuid())
+  title       String
+  goal        String?
+  startDate   DateTime?
+  endDate     DateTime?
+  status      SprintStatus @default(ACTIVE)
+  projectId   String
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 
 model UpdateLog {
   id        String   @id @default(uuid())
   title     String
-  content   String   @db.Text
+  content       String   @db.Text
   author    String
   projectId String
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -80,8 +107,12 @@ model Task {
   title       String
   description String?
   status      Status    @default(TODO)
+  dueDate        DateTime?
+  isSprintActive Boolean?  @default(false)
   stageId     String
-  stage       Stage     @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  stage       Stage    @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  sprintId    String?
+  sprint      Sprint?  @relation(fields: [sprintId], references: [id], onDelete: SetNull)
   subtasks    Subtask[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -92,7 +123,19 @@ model Subtask {
   title     String
   isDone    Boolean  @default(false)
   taskId    String
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Appointment {
+  id             String    @id @default(uuid())
+  title          String
+  description    String?
+  startTime      DateTime
+  endTime        DateTime
+  locationOrLink String?
+  isCompleted    Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }

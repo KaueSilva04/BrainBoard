@@ -5,6 +5,8 @@
 export type ProjectStatus = 'PLANNING' | 'ACTIVE' | 'COMPLETED';
 export type StageStatus = 'PLANNING' | 'IN_PROGRESS' | 'COMPLETED';
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE';
+export type ProjectType = 'SOFTWARE' | 'ACADEMIC';
+export type ActiveView = 'PROJECTS' | 'BOARD' | 'SPRINT' | 'ACADEMIC' | 'CALENDAR';
 
 // ---- Subtask -----------------------------------------------
 export interface Subtask {
@@ -23,7 +25,10 @@ export interface Task {
   description: string | null;
   status: TaskStatus;
   stageId: string;
+  dueDate?: string | null;
+  isSprintActive?: boolean | null;
   subtasks: Subtask[];
+  stage?: Stage;
   createdAt: string;
   updatedAt: string;
 }
@@ -69,6 +74,7 @@ export interface Project {
   description: string | null;
   businessLogic: string | null;
   status: ProjectStatus;
+  type?: ProjectType;
   githubRepo: string | null;
   settings: Record<string, unknown> | null;
   stages: Stage[];
@@ -84,6 +90,7 @@ export interface ProjectSummary {
   title: string;
   description: string | null;
   status: ProjectStatus;
+  type?: ProjectType;
   githubRepo: string | null;
   createdAt: string;
   updatedAt: string;
@@ -100,6 +107,7 @@ export interface CreateProjectInput {
   description?: string;
   businessLogic?: string;
   status?: ProjectStatus;
+  type?: ProjectType;
   githubRepo?: string;
   settings?: Record<string, unknown>;
 }
@@ -119,6 +127,17 @@ export interface CreateTaskInput {
   title: string;
   description?: string;
   status?: TaskStatus;
+  dueDate?: string | null;
+  isSprintActive?: boolean;
+}
+
+export interface UpdateTaskInput {
+  title?: string;
+  description?: string | null;
+  status?: TaskStatus;
+  stageId?: string;
+  dueDate?: string | null;
+  isSprintActive?: boolean;
 }
 
 export interface UpdateTaskStatusInput {
@@ -135,6 +154,96 @@ export interface CreateUpdateLogInput {
   title: string;
   content: string;
   author?: string;
+}
+
+// ---- Appointment Domain Types -----------------------------
+export interface Appointment {
+  id: string;
+  title: string;
+  description: string | null;
+  startTime: string; // ISO string
+  endTime: string;   // ISO string
+  locationOrLink: string | null;
+  isCompleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateAppointmentInput {
+  title: string;
+  startTime: string;
+  endTime: string;
+  description?: string | null;
+  locationOrLink?: string | null;
+}
+
+export interface UpdateAppointmentInput {
+  title?: string;
+  startTime?: string;
+  endTime?: string;
+  description?: string | null;
+  locationOrLink?: string | null;
+  isCompleted?: boolean;
+}
+
+// ---- Unified Calendar Event Projection --------------------
+export interface CalendarEventProjection {
+  id: string;
+  sourceId: string;
+  sourceType: 'APPOINTMENT' | 'TASK_DEADLINE';
+  title: string;
+  description: string | null;
+  start: string; // ISO string
+  end: string;   // ISO string
+  locationOrLink?: string | null;
+  isCompleted: boolean;
+  color: string;
+  projectTitle?: string;
+  stageTitle?: string;
+  projectType?: string;
+  status?: string;
+}
+
+// ---- Academic Domain Types ---------------------------------
+export interface AcademicDeadlineItem {
+  id: string;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  dueDate: string; // ISO string
+  daysRemaining: number;
+  isOverdue: boolean;
+  subjectId: string;
+  subjectTitle: string;
+  stageId: string;
+  stageTitle: string;
+}
+
+export interface AcademicSubject extends Project {
+  totalStages?: number;
+  totalDeadlines?: number;
+  pendingDeadlinesCount?: number;
+}
+
+export interface CreateAcademicSubjectInput {
+  title: string;
+  description?: string;
+  businessLogic?: string;
+  settings?: Record<string, unknown>;
+}
+
+export interface CreateAcademicDeadlineInput {
+  stageId: string;
+  title: string;
+  description?: string;
+  dueDate: string;
+}
+
+export interface UpdateAcademicDeadlineInput {
+  title?: string;
+  description?: string | null;
+  status?: TaskStatus;
+  dueDate?: string | null;
 }
 
 // ---- UI helpers --------------------------------------------

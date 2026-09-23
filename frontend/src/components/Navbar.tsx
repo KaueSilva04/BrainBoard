@@ -4,22 +4,20 @@ import {
   Plus,
   FolderKanban,
   GraduationCap,
-  UserCheck,
-  LayoutGrid,
   Calendar,
-  BarChart2,
-  Settings,
   Sparkles,
   Menu,
   X,
   Layers,
   ChevronRight,
+  Flame,
+  LayoutGrid,
 } from 'lucide-react';
-import type { ProjectSummary } from '../types';
+import type { ProjectSummary, ActiveView } from '../types';
 
 export interface NavbarProps {
-  currentView?: 'PROJECTS' | 'BOARD';
-  onSelectView?: (view: 'PROJECTS' | 'BOARD') => void;
+  currentView?: ActiveView;
+  onSelectView?: (view: ActiveView) => void;
   projects?: ProjectSummary[];
   activeProjectId?: string | null;
   onSelectProject?: (id: string | null) => void;
@@ -28,6 +26,9 @@ export interface NavbarProps {
   isConnected?: boolean;
   selectedCategory?: string;
   onSelectCategory?: (category: string) => void;
+  sprintActiveCount?: number;
+  academicCount?: number;
+  calendarCount?: number;
   categoryCounts?: {
     ALL?: number;
     PROJECT?: number;
@@ -46,44 +47,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenCreateProjectModal,
   onOpenCreateModal,
   isConnected = true,
-  selectedCategory = 'ALL',
-  onSelectCategory,
-  categoryCounts = { ALL: 0, PROJECT: 0, COLLEGE: 0, PERSONAL: 0 },
+  sprintActiveCount = 0,
+  academicCount = 0,
+  calendarCount = 0,
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  const categoryFilters = [
-    {
-      id: 'ALL',
-      label: 'Todas',
-      icon: <LayoutGrid className="w-4 h-4" />,
-      activeBg: 'bg-indigo-50 text-indigo-600 font-semibold',
-    },
-    {
-      id: 'PROJECT',
-      label: 'Projetos',
-      icon: <FolderKanban className="w-4 h-4 text-amber-500" />,
-      activeBg: 'bg-amber-50 text-amber-700 font-semibold border border-amber-200/60',
-    },
-    {
-      id: 'COLLEGE',
-      label: 'Faculdade',
-      icon: <GraduationCap className="w-4 h-4 text-purple-500" />,
-      activeBg: 'bg-purple-50 text-purple-700 font-semibold border border-purple-200/60',
-    },
-    {
-      id: 'PERSONAL',
-      label: 'Pessoais',
-      icon: <UserCheck className="w-4 h-4 text-emerald-500" />,
-      activeBg: 'bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200/60',
-    },
-  ];
-
-  const staticNavLinks = [
-    { label: 'Calendário', icon: <Calendar className="w-4 h-4" /> },
-    { label: 'Estatísticas', icon: <BarChart2 className="w-4 h-4" /> },
-    { label: 'Configurações', icon: <Settings className="w-4 h-4" /> },
-  ];
 
   const sidebarContent = (
     <div className="flex flex-col h-full justify-between p-5 space-y-6">
@@ -103,7 +71,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
             </div>
             <p className="text-[11px] text-slate-400 font-medium -mt-0.5">
-              Projetos & Kanban MCP
+              Projetos, Sprint & MCP
             </p>
           </div>
         </div>
@@ -114,7 +82,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             Navegação Principal
           </p>
 
-          {/* Portfolio View Button */}
+          {/* 1. Portfolio View Button */}
           <button
             onClick={() => {
               if (onSelectView) onSelectView('PROJECTS');
@@ -136,14 +104,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             </span>
           </button>
 
-          {/* Kanban Board View Button */}
+          {/* 2. Kanban Board View Button */}
           <button
             onClick={() => {
               if (onSelectView) onSelectView('BOARD');
               setIsMobileMenuOpen(false);
             }}
             className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs transition-colors ${
-              currentView === 'BOARD' || activeProjectId
+              currentView === 'BOARD'
                 ? 'bg-indigo-50 text-indigo-600 font-semibold'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium'
             }`}
@@ -157,17 +125,74 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </button>
 
-          {staticNavLinks.map((link) => (
-            <div
-              key={link.label}
-              className="flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-50 text-xs font-medium cursor-pointer transition-colors"
-            >
-              <div className="flex items-center gap-2.5">
-                {link.icon}
-                <span>{link.label}</span>
-              </div>
+          {/* 3. Visão Global View Button */}
+          <button
+            onClick={() => {
+              if (onSelectView) onSelectView('SPRINT');
+              setIsMobileMenuOpen(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs transition-colors ${
+              currentView === 'SPRINT'
+                ? 'bg-amber-50 text-amber-700 font-semibold border border-amber-200/60'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <Flame className="w-4 h-4 text-amber-500" />
+              <span>Visão Global</span>
             </div>
-          ))}
+            {sprintActiveCount > 0 && (
+              <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800">
+                {sprintActiveCount}
+              </span>
+            )}
+          </button>
+
+          {/* 4. Área Acadêmica View Button */}
+          <button
+            onClick={() => {
+              if (onSelectView) onSelectView('ACADEMIC');
+              setIsMobileMenuOpen(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs transition-colors ${
+              currentView === 'ACADEMIC'
+                ? 'bg-purple-50 text-purple-700 font-semibold border border-purple-200/60'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <GraduationCap className="w-4 h-4 text-purple-500" />
+              <span>Área Acadêmica</span>
+            </div>
+            {academicCount > 0 && (
+              <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800">
+                {academicCount}
+              </span>
+            )}
+          </button>
+
+          {/* 5. Calendário View Button */}
+          <button
+            onClick={() => {
+              if (onSelectView) onSelectView('CALENDAR');
+              setIsMobileMenuOpen(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs transition-colors ${
+              currentView === 'CALENDAR'
+                ? 'bg-indigo-50 text-indigo-600 font-semibold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <Calendar className="w-4 h-4 text-indigo-600" />
+              <span>Calendário</span>
+            </div>
+            {calendarCount > 0 && (
+              <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-100 text-indigo-700">
+                {calendarCount}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Project Switcher List */}
@@ -218,44 +243,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         )}
 
-        {/* Workspaces / Category Filters */}
-        <div className="mt-6 space-y-1">
-          <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-            Workspaces & Categorias
-          </p>
-          {categoryFilters.map((cat) => {
-            const isSelected = selectedCategory === cat.id;
-            const count = categoryCounts[cat.id] ?? 0;
-            return (
-              <button
-                key={cat.id}
-                onClick={() => {
-                  if (onSelectCategory) onSelectCategory(cat.id);
-                  setIsMobileMenuOpen(false);
-                }}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
-                  isSelected
-                    ? cat.activeBg
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  {cat.icon}
-                  <span>{cat.label}</span>
-                </div>
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                    isSelected
-                      ? 'bg-white text-slate-800 shadow-xs'
-                      : 'bg-slate-100 text-slate-500'
-                  }`}
-                >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        {/* Workspaces / Category Filters Removed for cleaner UI */}
       </div>
 
       {/* Bottom Card: Status & Action Button */}

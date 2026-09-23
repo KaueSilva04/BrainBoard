@@ -1,86 +1,170 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { projectsApi, stagesApi, tasksApi } from './services/api';
+import { projectsApi, stagesApi, tasksApi, academicApi, calendarApi } from './services/api';
 import type {
   Project,
   ProjectSummary,
   Task,
   TaskStatus,
+  ActiveView,
   CreateProjectInput,
   CreateStageInput,
   CreateTaskInput,
+  AcademicSubject,
 } from './types';
 import { Navbar } from './components/Navbar';
 import { TopHeader } from './components/TopHeader';
 import { KanbanBoard } from './components/KanbanBoard';
 import { ProjectList } from './components/ProjectList';
+import { SprintKanbanView } from './components/sprint/SprintKanbanView';
+import { AcademicView } from './components/academic/AcademicView';
+import { AcademicDisciplineView } from './components/academic/AcademicDisciplineView';
+import { CalendarView } from './components/calendar/CalendarView';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { CreateStageModal } from './components/CreateStageModal';
+import { CreateAppointmentModal } from './components/calendar/CreateAppointmentModal';
+import { CreateDeadlineModal } from './components/academic/CreateDeadlineModal';
 import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
-  const [currentView, setCurrentView] = useState<'PROJECTS' | 'BOARD'>('PROJECTS');
+  const [currentView, setCurrentView] = useState<ActiveView>('PROJECTS');
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingProject, setLoadingProject] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+
+  // Badges counters
+  const [sprintActiveCount, setSprintActiveCount] = useState<number>(0);
+  const [academicCount, setAcademicCount] = useState<number>(0);
+  const [calendarCount, setCalendarCount] = useState<number>(0);
+  const [academicSubjects, setAcademicSubjects] = useState<AcademicSubject[]>([]);
 
   // Modals state
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState<boolean>(false);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState<boolean>(false);
   const [isCreateStageModalOpen, setIsCreateStageModalOpen] = useState<boolean>(false);
+  const [isCreateAppointmentModalOpen, setIsCreateAppointmentModalOpen] = useState<boolean>(false);
+  const [isCreateDeadlineModalOpen, setIsCreateDeadlineModalOpen] = useState<boolean>(false);
   const [createTaskDefaultStageId, setCreateTaskDefaultStageId] = useState<string | undefined>(undefined);
 
-  // Load project list from backend
-  const loadProjects = useCallback(async () => {
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  // Load project list from backend (supports silent refresh)
+  const loadProjects = useCallback(async (silent = false) => {
     try {
-      setError(null);
+      if (!silent) setError(null);
       const data = await projectsApi.list();
       setProjects(data);
       setIsConnected(true);
       return data;
     } catch (err: any) {
       console.error('Failed to load projects:', err);
-      setError('Não foi possível conectar ao servidor backend. Verifique se o serviço está ativo.');
+      if (!silent) {
+        setError('Não foi possível conectar ao servidor backend. Verifique se o serviço está ativo.');
+      }
       setIsConnected(false);
       return [];
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
-  // Load full active project (with stages, tasks, subtasks)
-  const loadActiveProject = useCallback(async (id: string) => {
-    setLoadingProject(true);
+  // Load full active project with stages & tasks (supports silent refresh)
+  const loadActiveProject = useCallback(async (id: string, silent = false) => {
+    if (!silent) setLoadingProject(true);
     try {
-      setError(null);
+      if (!silent) setError(null);
       const data = await projectsApi.get(id);
       setActiveProject(data);
       setIsConnected(true);
+      return data;
     } catch (err: any) {
       console.error(`Failed to load project ${id}:`, err);
-      setError('Não foi possível carregar os detalhes do projeto selecionado.');
+      if (!silent) {
+        setError('Não foi possível carregar os detalhes do projeto selecionado.');
+      }
+      return null;
     } finally {
-      setLoadingProject(false);
+      if (!silent) setLoadingProject(false);
     }
   }, []);
 
+  // Master sync function
+  const syncAll = useCallback(async (silent = true) => {
+    if (!silent) setIsSyncing(true);
+    try {
+      const currentList = await loadProjects(silent);
+      if (activeProjectId) {
+        await loadActiveProject(activeProjectId, silent);
+      } else if (currentList && currentList.length > 0) {
+        setActiveProjectId(currentList[0].id);
+        await loadActiveProject(currentList[0].id, silent);
+      }
+
+      // Sync badge counters in parallel
+      try {
+        const [sprintTasks, subjectsList, eventsList] = await Promise.all([
+          tasksApi.listAll({ isSprintActive: true }).catch(() => []),
+          academicApi.listSubjects().catch(() => []),
+          calendarApi.getEvents({ includeCompleted: false }).catch(() => []),
+        ]);
+        setSprintActiveCount(sprintTasks.length);
+        setAcademicCount(subjectsList.length);
+        setCalendarCount(eventsList.length);
+        setAcademicSubjects(subjectsList);
+      } catch (e) {
+        // Non-blocking for badge updates
+      }
+
+      setIsConnected(true);
+    } catch (err) {
+      console.error('Auto-sync error:', err);
+    } finally {
+      if (!silent) setIsSyncing(false);
+    }
+  }, [loadProjects, loadActiveProject, activeProjectId]);
+
   // Initial load
   useEffect(() => {
-    loadProjects().then((data) => {
+    loadProjects(false).then((data) => {
       if (data && data.length > 0 && !activeProjectId) {
-        // Automatically focus on the first project if available
         setActiveProjectId(data[0].id);
-        setCurrentView('BOARD');
-        loadActiveProject(data[0].id);
+        loadActiveProject(data[0].id, false);
       }
     });
+
+    tasksApi.listAll({ isSprintActive: true }).then((t) => setSprintActiveCount(t.length)).catch(() => {});
+    academicApi.listSubjects().then((s) => { setAcademicCount(s.length); setAcademicSubjects(s); }).catch(() => {});
+    calendarApi.getEvents({ includeCompleted: false }).then((e) => setCalendarCount(e.length)).catch(() => {});
   }, [loadProjects, activeProjectId, loadActiveProject]);
+
+  // Real-time automatic background polling (every 3.5 seconds) & focus sync
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        syncAll(true);
+      }
+    }, 3500);
+
+    const onFocusOrVisible = () => {
+      if (document.visibilityState === 'visible') {
+        syncAll(true);
+      }
+    };
+
+    window.addEventListener('focus', onFocusOrVisible);
+    document.addEventListener('visibilitychange', onFocusOrVisible);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', onFocusOrVisible);
+      document.removeEventListener('visibilitychange', onFocusOrVisible);
+    };
+  }, [syncAll]);
 
   // Handler for selecting a project
   const handleSelectProject = (id: string | null) => {
@@ -112,15 +196,6 @@ export const App: React.FC = () => {
     );
   }, [activeTasks, searchQuery]);
 
-  // Category counts (for legacy sidebar compatibility)
-  const categoryCounts = useMemo(() => {
-    return {
-      ALL: activeTasks.length,
-      PROJECT: projects.length,
-      COLLEGE: 0,
-      PERSONAL: 0,
-    };
-  }, [activeTasks.length, projects.length]);
 
   // Project Creation Handler
   const handleCreateProject = async (input: CreateProjectInput) => {
@@ -291,32 +366,53 @@ export const App: React.FC = () => {
     setIsCreateTaskModalOpen(true);
   };
 
+  const handleDeleteProject = async (id: string, title: string) => {
+    if (window.confirm(`Tem certeza que deseja excluir o projeto "${title}" e todos os seus dados?`)) {
+      try {
+        await projectsApi.delete(id);
+        if (activeProjectId === id) {
+          handleSelectProject(null);
+        }
+        await loadProjects();
+      } catch (err) {
+        console.error('Failed to delete project:', err);
+        alert('Erro ao excluir projeto.');
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-800 flex flex-col md:flex-row">
       {/* Lateral Sidebar Navigation */}
-      <Navbar
-        currentView={currentView}
-        onSelectView={setCurrentView}
-        projects={projects}
-        activeProjectId={activeProjectId}
-        onSelectProject={handleSelectProject}
-        onOpenCreateProjectModal={() => setIsCreateProjectModalOpen(true)}
-        onOpenCreateModal={() => handleOpenCreateTask()}
-        isConnected={isConnected}
-        selectedCategory={selectedCategory}
-        onSelectCategory={setSelectedCategory}
-        categoryCounts={categoryCounts}
-      />
+        <Navbar
+          currentView={currentView}
+          onSelectView={setCurrentView}
+          projects={projects}
+          activeProjectId={activeProjectId}
+          onSelectProject={handleSelectProject}
+          onOpenCreateProjectModal={() => setIsCreateProjectModalOpen(true)}
+          onOpenCreateModal={() => handleOpenCreateTask()}
+          isConnected={isConnected}
+          sprintActiveCount={sprintActiveCount}
+          academicCount={academicCount}
+          calendarCount={calendarCount}
+        />
 
       {/* Main Content Viewport */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
         {/* Modern Top Header */}
         <TopHeader
+          currentView={currentView}
+          onSelectView={setCurrentView}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onOpenCreateModal={() => handleOpenCreateTask()}
           onOpenCreateProjectModal={() => setIsCreateProjectModalOpen(true)}
+          onOpenCreateAppointmentModal={() => setIsCreateAppointmentModalOpen(true)}
+          onOpenCreateDeadlineModal={() => setIsCreateDeadlineModalOpen(true)}
           isConnected={isConnected}
+          isSyncing={isSyncing}
+          onRefresh={() => syncAll(false)}
           activeProject={activeProject}
           onBackToProjects={() => handleSelectProject(null)}
         />
@@ -349,13 +445,32 @@ export const App: React.FC = () => {
               <Loader2 className="w-9 h-9 text-indigo-600 animate-spin" />
               <p className="text-sm text-slate-500 font-medium">Carregando BrainBoard...</p>
             </div>
-          ) : currentView === 'PROJECTS' || !activeProjectId ? (
+          ) : currentView === 'PROJECTS' ? (
             /* Portfolio View: List of all projects */
             <ProjectList
               projects={projects}
               onSelectProject={handleSelectProject}
               onOpenCreateProjectModal={() => setIsCreateProjectModalOpen(true)}
               searchQuery={searchQuery}
+              onDeleteProject={handleDeleteProject}
+            />
+          ) : currentView === 'SPRINT' ? (
+            /* Sprint Kanban View */
+            <SprintKanbanView onOpenCreateTask={() => handleOpenCreateTask()} />
+          ) : currentView === 'ACADEMIC' ? (
+            /* Academic View: Subjects & Deadlines */
+            <AcademicView onSelectProject={handleSelectProject} />
+          ) : currentView === 'CALENDAR' ? (
+            /* Calendar & Appointments View */
+            <CalendarView onSelectProject={handleSelectProject} />
+          ) : !activeProjectId ? (
+            /* Fallback to Project List if Board has no active project */
+            <ProjectList
+              projects={projects}
+              onSelectProject={handleSelectProject}
+              onOpenCreateProjectModal={() => setIsCreateProjectModalOpen(true)}
+              searchQuery={searchQuery}
+              onDeleteProject={handleDeleteProject}
             />
           ) : loadingProject ? (
             /* Loading Active Project */
@@ -363,6 +478,16 @@ export const App: React.FC = () => {
               <Loader2 className="w-9 h-9 text-indigo-600 animate-spin" />
               <p className="text-sm text-slate-500 font-medium">Carregando etapas e tarefas do projeto...</p>
             </div>
+          ) : activeProject?.type === 'ACADEMIC' ? (
+            /* Academic Discipline Layout */
+            <AcademicDisciplineView
+              project={activeProject}
+              stages={activeProject.stages || []}
+              tasks={displayedTasks}
+              onOpenCreateTask={handleOpenCreateTask}
+              onOpenCreateStage={() => setIsCreateStageModalOpen(true)}
+              onMoveTask={handleMoveTask}
+            />
           ) : (
             /* Active Project Kanban View */
             <KanbanBoard
@@ -377,14 +502,13 @@ export const App: React.FC = () => {
               onOpenCreateTask={handleOpenCreateTask}
               onOpenCreateStage={() => setIsCreateStageModalOpen(true)}
               onOpenCreateModal={() => handleOpenCreateTask()}
-              selectedCategory={selectedCategory}
             />
           )}
         </main>
 
         {/* Footer */}
         <footer className="py-4 border-t border-slate-200/80 text-center text-xs text-slate-400 bg-white/50">
-          BrainBoard v2.0 • Projetos, Etapas & MCP Integrado • Produtividade Inteligente
+          BrainBoard v2.0 • Projetos, Sprint, Acadêmico & Calendário • Produtividade Inteligente
         </footer>
       </div>
 
@@ -416,6 +540,21 @@ export const App: React.FC = () => {
         stages={activeProject?.stages || []}
         defaultStageId={createTaskDefaultStageId}
         onCreateTask={handleCreateTask}
+      />
+
+      {/* Create Appointment Modal */}
+      <CreateAppointmentModal
+        isOpen={isCreateAppointmentModalOpen}
+        onClose={() => setIsCreateAppointmentModalOpen(false)}
+        onAppointmentCreated={() => syncAll(true)}
+      />
+
+      {/* Create Deadline Modal */}
+      <CreateDeadlineModal
+        isOpen={isCreateDeadlineModalOpen}
+        onClose={() => setIsCreateDeadlineModalOpen(false)}
+        subjects={academicSubjects}
+        onDeadlineCreated={() => syncAll(true)}
       />
     </div>
   );

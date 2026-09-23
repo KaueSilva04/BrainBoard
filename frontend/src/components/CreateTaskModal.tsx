@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, Sparkles, Layers, CheckCircle2, Clock, PlayCircle } from 'lucide-react';
+import { X, Loader2, Sparkles, Layers, CheckCircle2, Clock, PlayCircle, Calendar, Flame } from 'lucide-react';
 import type { Stage, TaskStatus, CreateTaskInput } from '../types';
 import { TASK_STATUS_LABELS } from '../types';
 
@@ -10,6 +10,7 @@ export interface CreateTaskModalProps {
   defaultStageId?: string;
   onCreateTask: (stageId: string, input: CreateTaskInput) => Promise<void>;
   defaultCategory?: string;
+  defaultSprintActive?: boolean;
 }
 
 export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
@@ -18,11 +19,14 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   stages,
   defaultStageId,
   onCreateTask,
+  defaultSprintActive = false,
 }) => {
   const [title, setTitle] = useState('');
   const [selectedStageId, setSelectedStageId] = useState<string>('');
   const [status, setStatus] = useState<TaskStatus>('TODO');
   const [description, setDescription] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [isSprintActive, setIsSprintActive] = useState<boolean>(defaultSprintActive);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -32,6 +36,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       setTitle('');
       setDescription('');
       setStatus('TODO');
+      setDueDate('');
+      setIsSprintActive(Boolean(defaultSprintActive));
       setErrorMessage('');
       if (defaultStageId && stages.some((s) => s.id === defaultStageId)) {
         setSelectedStageId(defaultStageId);
@@ -41,7 +47,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         setSelectedStageId('');
       }
     }
-  }, [isOpen, defaultStageId, stages]);
+  }, [isOpen, defaultStageId, stages, defaultSprintActive]);
 
   // Handle ESC key press
   useEffect(() => {
@@ -78,6 +84,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         title: cleanTitle,
         description: description.trim() || undefined,
         status,
+        dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
+        isSprintActive,
       });
       onClose();
     } catch (err: any) {
@@ -244,12 +252,47 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             <textarea
               id="task-desc"
               name="description"
-              rows={3}
+              rows={2}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Adicione detalhes, notas ou contexto para esta tarefa..."
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all resize-none"
+              className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all resize-none"
             />
+          </div>
+
+          {/* Due Date & Sprint Active Options */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            {/* Due Date Field */}
+            <div className="space-y-1">
+              <label htmlFor="task-due" className="block text-xs font-bold text-slate-700 flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Prazo Limite <span className="text-slate-400 font-normal">(Opcional)</span></span>
+              </label>
+              <input
+                id="task-due"
+                name="dueDate"
+                type="datetime-local"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
+              />
+            </div>
+
+            {/* isSprintActive Checkbox */}
+            <div className="space-y-1 flex flex-col justify-end">
+              <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200/80 bg-slate-50/70 hover:bg-slate-100/70 cursor-pointer transition-colors">
+                <input
+                  type="checkbox"
+                  checked={isSprintActive}
+                  onChange={(e) => setIsSprintActive(e.target.checked)}
+                  className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400"
+                />
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                  <Flame className="w-4 h-4 text-amber-500" />
+                  <span>Sprint Semanal</span>
+                </div>
+              </label>
+            </div>
           </div>
 
           {/* Footer Actions */}

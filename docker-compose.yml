@@ -12,6 +12,12 @@ services:
     environment:
       - PORT=3000
       - DATABASE_URL=${DATABASE_URL:-postgresql://neondb_owner:npg_6YesJQpTMRk4@ep-holy-mode-acy9p31p-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - focustask_network
 
@@ -24,7 +30,8 @@ services:
     ports:
       - "5173:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - focustask_network
 

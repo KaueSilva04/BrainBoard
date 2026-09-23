@@ -9,10 +9,13 @@ import {
   Plus,
   Loader2,
   CheckSquare,
+  Flame,
+  Calendar,
 } from 'lucide-react';
 import type { Task, TaskStatus } from '../types';
 import { TASK_STATUS_LABELS } from '../types';
 import { SubtaskItem } from './SubtaskItem';
+import { tasksApi } from '../services/api';
 
 export interface TaskCardProps {
   task: Task;
@@ -22,6 +25,7 @@ export interface TaskCardProps {
   onAddSubtask: (taskId: string, title: string) => Promise<void>;
   onToggleSubtask: (id: string, isDone: boolean) => Promise<void>;
   onDeleteSubtask?: (id: string) => Promise<void>;
+  onToggleSprint?: (id: string, isSprintActive: boolean) => Promise<void>;
 }
 
 export const TaskCard: React.FC<TaskCardProps> = ({
@@ -32,12 +36,15 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onAddSubtask,
   onToggleSubtask,
   onDeleteSubtask,
+  onToggleSprint,
 }) => {
   const [subtaskTitle, setSubtaskTitle] = useState('');
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showSubtaskForm, setShowSubtaskForm] = useState(false);
+  const [isSprintActive, setIsSprintActive] = useState<boolean>(Boolean(task.isSprintActive));
+  const [isTogglingSprint, setIsTogglingSprint] = useState(false);
 
   const statusConfig: Record<
     TaskStatus,
@@ -106,16 +113,55 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     }
   };
 
+  const handleToggleSprint = async () => {
+    if (isTogglingSprint) return;
+    const nextVal = !isSprintActive;
+    setIsTogglingSprint(true);
+    setIsSprintActive(nextVal);
+    try {
+      if (onToggleSprint) {
+        await onToggleSprint(task.id, nextVal);
+      } else {
+        await tasksApi.toggleSprint(task.id, nextVal);
+      }
+    } catch (err) {
+      console.error('Failed to toggle sprint state:', err);
+      setIsSprintActive(!nextVal);
+    } finally {
+      setIsTogglingSprint(false);
+    }
+  };
+
   // Format date or relative days
-  const taskDate = new Date(task.createdAt);
   const now = new Date();
-  const diffDays = Math.max(0, Math.floor((now.getTime() - taskDate.getTime()) / (1000 * 60 * 60 * 24)));
-  const dateDisplay =
-    diffDays === 0
-      ? 'Hoje'
-      : diffDays === 1
-      ? '1 dia restante'
-      : `${diffDays} dias restantes`;
+  let dateDisplay = '';
+  let isOverdue = false;
+
+  if (task.dueDate) {
+    const due = new Date(task.dueDate);
+    const diffMs = due.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) {
+      dateDisplay = `Atrasado (${Math.abs(diffDays)}d)`;
+      isOverdue = true;
+    } else if (diffDays === 0) {
+      dateDisplay = 'Entrega hoje';
+    } else if (diffDays === 1) {
+      dateDisplay = 'Amanhã';
+    } else {
+      dateDisplay = `${diffDays} dias restantes`;
+    }
+  } else {
+    const taskDate = new Date(task.createdAt);
+    const diffDays = Math.max(0, Math.floor((now.getTime() - taskDate.getTime()) / (1000 * 60 * 60 * 24)));
+    dateDisplay =
+      diffDays === 0
+        ? 'Criado hoje'
+        : diffDays === 1
+        ? 'Criado ontem'
+        : `Criado há ${diffDays}d`;
+  }
 
   const currentStatusConfig = statusConfig[task.status] || statusConfig.TODO;
 
@@ -142,10 +188,46 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                   {stageName}
                 </span>
               )}
+              {/* Quick Sprint Active Toggle Badge */}
+              <button
+                type="button"
+                onClick={handleToggleSprint}
+                disabled={isTogglingSprint}
+                title={isSprintActive ? 'Remover da Sprint Semanal' : 'Adicionar à Sprint Semanal'}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold transition-all ${
+                  isSprintActive
+                    ? 'bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200 shadow-2xs'
+                    : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50 border border-transparent hover:border-amber-200'
+                }`}
+              >
+                {isTogglingSprint ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Flame className={`w-3 h-3 ${isSprintActive ? 'text-amber-600 fill-amber-500' : ''}`} />
+                )}
+                <span>{isSprintActive ? 'Sprint' : '+Sprint'}</span>
+              </button>
             </div>
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5 font-medium">
-              <Clock className="w-3 h-3 text-slate-400" />
-              <span>{dateDisplay}</span>
+            <div className="flex items-center gap-1.5 text-[11px] mt-0.5 font-medium">
+              {task.dueDate ? (
+                <span
+                  className={`inline-flex items-center gap-1 ${
+                    isOverdue
+                      ? 'text-rose-600 font-bold'
+                      : task.status === 'DONE'
+                      ? 'text-slate-400'
+                      : 'text-indigo-600 font-semibold'
+                  }`}
+                >
+                  <Calendar className="w-3 h-3" />
+                  <span>{dateDisplay}</span>
+                </span>
+              ) : (
+                <span className="text-slate-400 flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-slate-400" />
+                  <span>{dateDisplay}</span>
+                </span>
+              )}
             </div>
           </div>
         </div>
