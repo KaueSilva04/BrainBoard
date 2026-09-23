@@ -214,7 +214,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
 
-            <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
+            <div className="space-y-0.5 max-h-80 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200">
               {projects.map((p) => {
                 const isActive = activeProjectId === p.id;
                 return (

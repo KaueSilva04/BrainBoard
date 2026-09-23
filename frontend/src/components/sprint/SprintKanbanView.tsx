@@ -522,6 +522,14 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
                                       handleAddSubtask(task.id);
                                     }
                                   }}
+                                  onBlur={() => {
+                                    if (subtaskTitle.trim()) {
+                                      handleAddSubtask(task.id);
+                                    } else {
+                                      setActiveSubtaskFormId(null);
+                                      setSubtaskTitle('');
+                                    }
+                                  }}
                                   className="flex-1 bg-slate-50 border border-slate-200 focus:bg-white focus:border-amber-500 rounded-lg px-2.5 py-1 text-xs text-slate-800 placeholder-slate-400 focus:outline-none"
                                 />
                                 <button

@@ -123,38 +123,48 @@ export const AcademicDisciplineView: React.FC<AcademicDisciplineViewProps> = ({
                   {/* Tasks List */}
                   <div className="p-4 flex-1 bg-white space-y-3">
                     {stageTasks.length === 0 ? (
-                      <div className="text-center py-6 text-xs text-slate-400 font-medium">
+                      <div className="text-center py-6 text-xs text-slate-500 font-medium">
                         Nenhuma entrega registrada
                       </div>
                     ) : (
-                      stageTasks.map((task) => {
-                        const isDone = task.status === 'DONE';
-                        return (
-                          <div 
-                            key={task.id} 
-                            onClick={() => onOpenCreateTask(task.stageId)} // Em um cenario real, abriria o modal de edição
-                            className={`group flex flex-col gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
-                              isDone ? 'bg-slate-50 border-slate-200/60 opacity-70' : 'bg-white border-slate-200 hover:border-purple-300 shadow-xs'
-                            }`}
-                          >
-                            <div className="flex items-start gap-2.5">
-                              <div className="mt-0.5 shrink-0">{getStatusIcon(task.status)}</div>
-                              <div className="min-w-0 flex-1">
-                                <p className={`text-sm font-bold truncate ${isDone ? 'text-slate-500 line-through' : 'text-slate-800'}`}>
-                                  {task.title}
-                                </p>
-                                {task.dueDate && (
-                                  <div className="flex items-center gap-1 mt-1 text-[10px] font-semibold text-slate-500">
-                                    <Calendar className="w-3 h-3" />
-                                    <span>
-                                      {new Date(task.dueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
-                                    </span>
-                                  </div>
-                                )}
+                      stageTasks
+                        .sort((a, b) => {
+                          if (!a.dueDate) return 1;
+                          if (!b.dueDate) return -1;
+                          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+                        })
+                        .map((task) => {
+                          const isDone = task.status === 'DONE';
+                          return (
+                            <div 
+                              key={task.id} 
+                              onClick={() => {
+                                // Prevent opening create task on an existing task.
+                                // In a real scenario, this would open an edit/view modal.
+                                console.log('Abrir detalhes da tarefa:', task.id);
+                              }}
+                              className={`group flex flex-col gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
+                                isDone ? 'bg-slate-50 border-slate-200/60 opacity-70' : 'bg-white border-slate-200 hover:border-purple-300 shadow-xs'
+                              }`}
+                            >
+                              <div className="flex items-start gap-2.5">
+                                <div className="mt-0.5 shrink-0">{getStatusIcon(task.status)}</div>
+                                <div className="min-w-0 flex-1">
+                                  <p className={`text-sm font-bold truncate ${isDone ? 'text-slate-500 line-through' : 'text-slate-800'}`}>
+                                    {task.title}
+                                  </p>
+                                  {task.dueDate && (
+                                    <div className="flex items-center gap-1 mt-1 text-[10px] font-semibold text-slate-500">
+                                      <Calendar className="w-3 h-3" />
+                                      <span>
+                                        {new Date(task.dueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        );
+                          );
                       })
                     )}
                   </div>
