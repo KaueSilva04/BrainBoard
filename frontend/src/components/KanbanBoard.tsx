@@ -34,13 +34,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onOpenCreateModal,
 }) => {
   const [boardView, setBoardView] = useState<'STAGES' | 'STATUS'>('STATUS');
-  const [filterMode, setFilterMode] = useState<'ALL' | 'SPRINT'>('ALL');
-
-  const displayedTasks = filterMode === 'SPRINT' ? tasks.filter(t => t.isSprintActive) : tasks;
-
-  const todoTasks = displayedTasks.filter((t) => t.status === 'TODO');
-  const inProgressTasks = displayedTasks.filter((t) => t.status === 'IN_PROGRESS');
-  const doneTasks = displayedTasks.filter((t) => t.status === 'DONE');
+  const todoTasks = tasks.filter((t) => t.status === 'TODO');
+  const inProgressTasks = tasks.filter((t) => t.status === 'IN_PROGRESS');
+  const doneTasks = tasks.filter((t) => t.status === 'DONE');
 
   const handleCreateTaskTrigger = (stageId?: string) => {
     if (onOpenCreateTask) {
@@ -59,38 +55,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
         <div className="flex items-center gap-4 flex-wrap">
           
-          {/* Scope Filter: All vs Sprint */}
-          <div className="flex items-center bg-slate-100/80 p-1 rounded-lg border border-slate-200/60 shadow-inner">
-            <button
-              type="button"
-              onClick={() => setFilterMode('ALL')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                filterMode === 'ALL'
-                  ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50'
-                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>Backlog do Projeto</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterMode('SPRINT')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                filterMode === 'SPRINT'
-                  ? 'bg-white text-indigo-700 shadow-sm border border-slate-200/50'
-                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
-              }`}
-            >
-              <Milestone className="w-3.5 h-3.5" />
-              <span>Sprint Semanal</span>
-              {filterMode !== 'SPRINT' && tasks.filter(t => t.isSprintActive).length > 0 && (
-                <span className="ml-1 w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-              )}
-            </button>
-          </div>
 
-          <div className="w-px h-5 bg-slate-200 hidden sm:block" />
 
           {/* Grouping Toggle */}
           <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
@@ -155,7 +120,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {stages.map((stage) => {
-              const stageTasks = displayedTasks.filter((t) => t.stageId === stage.id);
+              const stageTasks = tasks.filter((t) => t.stageId === stage.id);
               return (
                 <StageColumn
                   key={stage.id}

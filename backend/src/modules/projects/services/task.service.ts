@@ -19,6 +19,10 @@ export class TaskService {
       where.stageId = filters.stageId;
     }
 
+    if (filters?.projectId) {
+      where.stage = { projectId: filters.projectId };
+    }
+
     if (filters?.status) {
       if (!VALID_STATUSES.includes(filters.status as Status)) {
         throw new ValidationError(

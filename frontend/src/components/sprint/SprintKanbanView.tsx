@@ -23,9 +23,10 @@ import { SubtaskItem } from '../SubtaskItem';
 
 export interface SprintKanbanViewProps {
   onOpenCreateTask?: () => void;
+  projectId?: string;
 }
 
-export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreateTask }) => {
+export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreateTask, projectId }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +44,7 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
     if (!silent) setLoading(true);
     try {
       if (!silent) setError(null);
-      const data = await tasksApi.listAll({ isSprintActive: true });
+      const data = await tasksApi.listAll({ isSprintActive: true, projectId });
       setTasks(data);
     } catch (err: any) {
       console.error('Failed to load sprint tasks:', err);
@@ -51,7 +52,7 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
     } finally {
       if (!silent) setLoading(false);
     }
-  }, []);
+  }, [projectId]);
 
   useEffect(() => {
     loadSprintTasks();

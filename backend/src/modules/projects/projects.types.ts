@@ -92,6 +92,7 @@ export interface UpdateTaskInput {
 
 export interface TaskFilterOptions {
   stageId?: string | undefined;
+  projectId?: string | undefined;
   status?: string | undefined;
   isSprintActive?: boolean | undefined;
   hasDueDate?: boolean | undefined;

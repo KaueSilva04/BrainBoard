@@ -8,6 +8,7 @@ import {
   LayoutGrid,
   Flame,
   Calendar,
+  Milestone,
 } from 'lucide-react';
 import type { Project, ProjectSummary, ActiveView } from '../types';
 
@@ -66,6 +67,11 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
       label: 'Quadro Kanban', 
       icon: <LayoutGrid className="w-3.5 h-3.5" /> 
     });
+    viewTabs.push({ 
+      id: 'PROJECT_SPRINT', 
+      label: 'Sprint Semanal', 
+      icon: <Milestone className="w-3.5 h-3.5" /> 
+    });
   }
 
   viewTabs.push(
@@ -80,7 +86,9 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   if (currentView === 'BOARD') {
     viewTitle = activeProject ? activeProject.title : 'Painel de Projeto';
     viewSubtitle = activeProject?.description || 'Acompanhe as tarefas e progresso';
-
+  } else if (currentView === 'PROJECT_SPRINT') {
+    viewTitle = `Sprint: ${activeProject?.title || ''}`;
+    viewSubtitle = 'Foco da semana: tarefas ativas deste projeto';
   } else if (currentView === 'SPRINT') {
     viewTitle = 'Visão Global';
     viewSubtitle = 'Foco da semana: todas as suas tarefas ativas';

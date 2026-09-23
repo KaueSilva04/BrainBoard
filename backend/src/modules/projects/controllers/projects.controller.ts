@@ -488,8 +488,9 @@ export const deleteMember = async (req: Request, res: Response) => {
 
 export const listTasks = async (req: Request, res: Response) => {
   try {
-    const { status, isSprintActive, hasDueDate } = req.query;
+    const { status, isSprintActive, hasDueDate, projectId } = req.query;
     const stageId = req.query.stageId ? String(req.query.stageId).trim() : undefined;
+    const projId = projectId ? String(projectId).trim() : undefined;
     const statusStr = status ? String(status) : undefined;
 
     if (statusStr && !VALID_STATUSES.includes(statusStr as any)) {
@@ -500,6 +501,7 @@ export const listTasks = async (req: Request, res: Response) => {
 
     const tasks = await taskService.listTasks({
       stageId,
+      projectId: projId,
       status: statusStr,
       isSprintActive: isSprintActive !== undefined ? isSprintActive === 'true' : undefined,
       hasDueDate: hasDueDate !== undefined ? hasDueDate === 'true' : undefined,

@@ -7,7 +7,7 @@ export type StageStatus = 'PLANNING' | 'IN_PROGRESS' | 'COMPLETED';
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE';
 export type ProjectType = 'SOFTWARE';
 export type SprintStatus = 'ACTIVE' | 'COMPLETED' | 'PLANNING';
-export type ActiveView = 'PROJECTS' | 'BOARD' | 'SPRINT' | 'ACADEMIC' | 'CALENDAR';
+export type ActiveView = 'PROJECTS' | 'BOARD' | 'SPRINT' | 'PROJECT_SPRINT' | 'ACADEMIC' | 'CALENDAR';
 
 export type AssignmentType = 'EXAM' | 'HOMEWORK' | 'PROJECT' | 'PRESENTATION' | 'READING' | 'OTHER';
 export type AssignmentStatus = 'TODO' | 'IN_PROGRESS' | 'DONE';

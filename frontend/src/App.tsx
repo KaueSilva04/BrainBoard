@@ -466,6 +466,8 @@ export const App: React.FC = () => {
               <Loader2 className="w-9 h-9 text-indigo-600 animate-spin" />
               <p className="text-sm text-slate-500 font-medium">Carregando etapas e tarefas do projeto...</p>
             </div>
+          ) : currentView === 'PROJECT_SPRINT' ? (
+            <SprintKanbanView projectId={activeProject!.id} onOpenCreateTask={() => handleOpenCreateTask()} />
           ) : (
             /* Active Project Kanban View */
             <KanbanBoard

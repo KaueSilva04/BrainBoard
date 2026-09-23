@@ -154,12 +154,14 @@ export const tasksApi = {
     status?: TaskStatus;
     hasDueDate?: boolean;
     stageId?: string;
+    projectId?: string;
   }): Promise<Task[]> {
     const params = new URLSearchParams();
     if (filters?.isSprintActive !== undefined) params.set('isSprintActive', String(filters.isSprintActive));
     if (filters?.status) params.set('status', filters.status);
     if (filters?.hasDueDate !== undefined) params.set('hasDueDate', String(filters.hasDueDate));
     if (filters?.stageId) params.set('stageId', filters.stageId);
+    if (filters?.projectId) params.set('projectId', filters.projectId);
     const qs = params.toString();
     return request(`/api/tasks${qs ? `?${qs}` : ''}`);
   },
