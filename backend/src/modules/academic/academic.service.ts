@@ -2,8 +2,6 @@ import { prisma } from '../../prisma.js';
 import { ValidationError, NotFoundError } from '../shared/errors.js';
 import { parseIsoDate } from '../shared/date.utils.js';
 import type {
-  CreateAcademicTermInput,
-  UpdateAcademicTermInput,
   CreateAcademicSubjectInput,
   UpdateAcademicSubjectInput,
   CreateAcademicAssignmentInput,
@@ -11,85 +9,12 @@ import type {
 } from './academic.types.js';
 
 export class AcademicService {
-  // --- TERMS ---
-  async listTerms() {
-    return prisma.academicTerm.findMany({
-      include: {
-        subjects: {
-          include: {
-            assignments: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  async getTermById(id: string) {
-    if (!id) throw new ValidationError('Term ID is required');
-    const term = await prisma.academicTerm.findUnique({
-      where: { id },
-      include: {
-        subjects: {
-          include: { assignments: true },
-        },
-      },
-    });
-    if (!term) throw new NotFoundError('Term not found');
-    return term;
-  }
-
-  async createTerm(data: CreateAcademicTermInput) {
-    if (!data.title?.trim()) throw new ValidationError('Title is required');
-    return prisma.academicTerm.create({
-      data: {
-        title: data.title.trim(),
-        startDate: data.startDate ? parseIsoDate(data.startDate, 'startDate') : null,
-        endDate: data.endDate ? parseIsoDate(data.endDate, 'endDate') : null,
-        ...(data.status !== undefined && { status: data.status }),
-      },
-    });
-  }
-
-  async updateTerm(id: string, data: UpdateAcademicTermInput) {
-    if (!id) throw new ValidationError('Term ID is required');
-    try {
-      return await prisma.academicTerm.update({
-        where: { id },
-        data: {
-          ...(data.title !== undefined && { title: data.title.trim() }),
-          ...(data.startDate !== undefined && { startDate: data.startDate ? parseIsoDate(data.startDate, 'startDate') : null }),
-          ...(data.endDate !== undefined && { endDate: data.endDate ? parseIsoDate(data.endDate, 'endDate') : null }),
-          ...(data.status !== undefined && { status: data.status }),
-        },
-      });
-    } catch (error: any) {
-      if (error.code === 'P2025') throw new NotFoundError('Term not found');
-      throw error;
-    }
-  }
-
-  async deleteTerm(id: string) {
-    if (!id) throw new ValidationError('Term ID is required');
-    try {
-      await prisma.academicTerm.delete({ where: { id } });
-    } catch (error: any) {
-      if (error.code === 'P2025') throw new NotFoundError('Term not found');
-      throw error;
-    }
-  }
-
   // --- SUBJECTS ---
   async createSubject(data: CreateAcademicSubjectInput) {
-    if (!data.termId) throw new ValidationError('termId is required');
     if (!data.title?.trim()) throw new ValidationError('Title is required');
-    
-    const term = await prisma.academicTerm.findUnique({ where: { id: data.termId } });
-    if (!term) throw new NotFoundError('Term not found');
 
     return prisma.academicSubject.create({
       data: {
-        termId: data.termId,
         title: data.title.trim(),
         description: data.description?.trim() || null,
         professor: data.professor?.trim() || null,

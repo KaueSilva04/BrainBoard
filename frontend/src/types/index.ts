@@ -7,10 +7,8 @@ export type StageStatus = 'PLANNING' | 'IN_PROGRESS' | 'COMPLETED';
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE';
 export type ProjectType = 'SOFTWARE';
 export type SprintStatus = 'ACTIVE' | 'COMPLETED' | 'PLANNING';
-export type ActiveView = 'PROJECTS' | 'BOARD' | 'SPRINT' | 'PROJECT_SPRINTS' | 'ACADEMIC' | 'CALENDAR';
+export type ActiveView = 'PROJECTS' | 'BOARD' | 'SPRINT' | 'ACADEMIC' | 'CALENDAR';
 
-// ---- Academic ----
-export type AcademicTermStatus = 'PLANNED' | 'ACTIVE' | 'COMPLETED';
 export type AssignmentType = 'EXAM' | 'HOMEWORK' | 'PROJECT' | 'PRESENTATION' | 'READING' | 'OTHER';
 export type AssignmentStatus = 'TODO' | 'IN_PROGRESS' | 'DONE';
 
@@ -34,20 +32,7 @@ export interface AcademicSubject {
   description: string | null;
   professor: string | null;
   colorCode: string | null;
-  termId: string;
-  term?: AcademicTerm;
   assignments?: AcademicAssignment[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface AcademicTerm {
-  id: string;
-  title: string;
-  startDate: string | null;
-  endDate: string | null;
-  status: AcademicTermStatus;
-  subjects?: AcademicSubject[];
   createdAt: string;
   updatedAt: string;
 }
@@ -265,18 +250,11 @@ export interface CalendarEventProjection {
 }
 
 // ---- Academic UI Types -------------------------------------
-export interface CreateAcademicTermInput {
-  title: string;
-  startDate?: string;
-  endDate?: string;
-}
-
 export interface CreateAcademicSubjectInput {
   title: string;
   description?: string;
   professor?: string;
   colorCode?: string;
-  termId: string;
 }
 
 export interface CreateAcademicAssignmentInput {

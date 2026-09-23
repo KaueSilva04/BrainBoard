@@ -15,7 +15,6 @@ import { TopHeader } from './components/TopHeader';
 import { KanbanBoard } from './components/KanbanBoard';
 import { ProjectList } from './components/ProjectList';
 import { SprintKanbanView } from './components/sprint/SprintKanbanView';
-import { ProjectSprintsView } from './components/sprint/ProjectSprintsView';
 import { AcademicView } from './components/academic/AcademicView';
 import { CalendarView } from './components/calendar/CalendarView';
 import { CreateTaskModal } from './components/CreateTaskModal';
@@ -467,8 +466,6 @@ export const App: React.FC = () => {
               <Loader2 className="w-9 h-9 text-indigo-600 animate-spin" />
               <p className="text-sm text-slate-500 font-medium">Carregando etapas e tarefas do projeto...</p>
             </div>
-          ) : currentView === 'PROJECT_SPRINTS' ? (
-            <ProjectSprintsView project={activeProject!} />
           ) : (
             /* Active Project Kanban View */
             <KanbanBoard

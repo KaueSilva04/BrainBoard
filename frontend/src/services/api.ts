@@ -353,21 +353,9 @@ export const calendarApi = {
 // Academic API
 // ============================================================
 export const academicApi = {
-  // Terms
-  listTerms(): Promise<import('../types').AcademicTerm[]> {
-    return request('/api/academic/terms');
-  },
-  createTerm(input: import('../types').CreateAcademicTermInput): Promise<import('../types').AcademicTerm> {
-    return request('/api/academic/terms', { method: 'POST', body: JSON.stringify(input) });
-  },
-  deleteTerm(id: string): Promise<void> {
-    return request(`/api/academic/terms/${id}`, { method: 'DELETE' });
-  },
-
   // Subjects
-  listSubjects(termId?: string): Promise<import('../types').AcademicSubject[]> {
-    const qs = termId ? `?termId=${termId}` : '';
-    return request(`/api/academic/subjects${qs}`);
+  listSubjects(): Promise<import('../types').AcademicSubject[]> {
+    return request('/api/academic/subjects');
   },
   createSubject(input: import('../types').CreateAcademicSubjectInput): Promise<import('../types').AcademicSubject> {
     return request('/api/academic/subjects', { method: 'POST', body: JSON.stringify(input) });

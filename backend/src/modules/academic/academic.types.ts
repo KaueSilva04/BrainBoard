@@ -1,21 +1,6 @@
-import { AcademicTermStatus, AssignmentType, AssignmentStatus } from '@prisma/client';
-
-export interface CreateAcademicTermInput {
-  title: string;
-  startDate?: string | Date | null;
-  endDate?: string | Date | null;
-  status?: AcademicTermStatus;
-}
-
-export interface UpdateAcademicTermInput {
-  title?: string;
-  startDate?: string | Date | null;
-  endDate?: string | Date | null;
-  status?: AcademicTermStatus;
-}
+import { AssignmentType, AssignmentStatus } from '@prisma/client';
 
 export interface CreateAcademicSubjectInput {
-  termId: string;
   title: string;
   description?: string | null;
   professor?: string | null;

@@ -83,7 +83,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               }`}
             >
               <Milestone className="w-3.5 h-3.5" />
-              <span>Sprint Ativa</span>
+              <span>Sprint Semanal</span>
               {filterMode !== 'SPRINT' && tasks.filter(t => t.isSprintActive).length > 0 && (
                 <span className="ml-1 w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
               )}
