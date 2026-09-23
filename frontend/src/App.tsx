@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { projectsApi, stagesApi, tasksApi, academicApi, calendarApi } from './services/api';
+import { projectsApi, stagesApi, tasksApi, calendarApi } from './services/api';
 import type {
   Project,
   ProjectSummary,
@@ -9,21 +9,19 @@ import type {
   CreateProjectInput,
   CreateStageInput,
   CreateTaskInput,
-  AcademicSubject,
 } from './types';
 import { Navbar } from './components/Navbar';
 import { TopHeader } from './components/TopHeader';
 import { KanbanBoard } from './components/KanbanBoard';
 import { ProjectList } from './components/ProjectList';
 import { SprintKanbanView } from './components/sprint/SprintKanbanView';
+import { ProjectSprintsView } from './components/sprint/ProjectSprintsView';
 import { AcademicView } from './components/academic/AcademicView';
-import { AcademicDisciplineView } from './components/academic/AcademicDisciplineView';
 import { CalendarView } from './components/calendar/CalendarView';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { CreateStageModal } from './components/CreateStageModal';
 import { CreateAppointmentModal } from './components/calendar/CreateAppointmentModal';
-import { CreateDeadlineModal } from './components/academic/CreateDeadlineModal';
 import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -39,16 +37,13 @@ export const App: React.FC = () => {
 
   // Badges counters
   const [sprintActiveCount, setSprintActiveCount] = useState<number>(0);
-  const [academicCount, setAcademicCount] = useState<number>(0);
   const [calendarCount, setCalendarCount] = useState<number>(0);
-  const [academicSubjects, setAcademicSubjects] = useState<AcademicSubject[]>([]);
 
   // Modals state
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState<boolean>(false);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState<boolean>(false);
   const [isCreateStageModalOpen, setIsCreateStageModalOpen] = useState<boolean>(false);
   const [isCreateAppointmentModalOpen, setIsCreateAppointmentModalOpen] = useState<boolean>(false);
-  const [isCreateDeadlineModalOpen, setIsCreateDeadlineModalOpen] = useState<boolean>(false);
   const [createTaskDefaultStageId, setCreateTaskDefaultStageId] = useState<string | undefined>(undefined);
 
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -105,17 +100,14 @@ export const App: React.FC = () => {
         await loadActiveProject(currentList[0].id, silent);
       }
 
-      // Sync badge counters in parallel
+    // Sync badge counters in parallel
       try {
-        const [sprintTasks, subjectsList, eventsList] = await Promise.all([
+        const [sprintTasks, eventsList] = await Promise.all([
           tasksApi.listAll({ isSprintActive: true }).catch(() => []),
-          academicApi.listSubjects().catch(() => []),
           calendarApi.getEvents({ includeCompleted: false }).catch(() => []),
         ]);
         setSprintActiveCount(sprintTasks.length);
-        setAcademicCount(subjectsList.length);
         setCalendarCount(eventsList.length);
-        setAcademicSubjects(subjectsList);
       } catch (e) {
         // Non-blocking for badge updates
       }
@@ -138,7 +130,6 @@ export const App: React.FC = () => {
     });
 
     tasksApi.listAll({ isSprintActive: true }).then((t) => setSprintActiveCount(t.length)).catch(() => {});
-    academicApi.listSubjects().then((s) => { setAcademicCount(s.length); setAcademicSubjects(s); }).catch(() => {});
     calendarApi.getEvents({ includeCompleted: false }).then((e) => setCalendarCount(e.length)).catch(() => {});
   }, [loadProjects, activeProjectId, loadActiveProject]);
 
@@ -394,7 +385,6 @@ export const App: React.FC = () => {
           onOpenCreateModal={() => handleOpenCreateTask()}
           isConnected={isConnected}
           sprintActiveCount={sprintActiveCount}
-          academicCount={academicCount}
           calendarCount={calendarCount}
         />
 
@@ -409,7 +399,6 @@ export const App: React.FC = () => {
           onOpenCreateModal={() => handleOpenCreateTask()}
           onOpenCreateProjectModal={() => setIsCreateProjectModalOpen(true)}
           onOpenCreateAppointmentModal={() => setIsCreateAppointmentModalOpen(true)}
-          onOpenCreateDeadlineModal={() => setIsCreateDeadlineModalOpen(true)}
           isConnected={isConnected}
           isSyncing={isSyncing}
           onRefresh={() => syncAll(false)}
@@ -459,7 +448,7 @@ export const App: React.FC = () => {
             <SprintKanbanView onOpenCreateTask={() => handleOpenCreateTask()} />
           ) : currentView === 'ACADEMIC' ? (
             /* Academic View: Subjects & Deadlines */
-            <AcademicView onSelectProject={handleSelectProject} />
+            <AcademicView />
           ) : currentView === 'CALENDAR' ? (
             /* Calendar & Appointments View */
             <CalendarView onSelectProject={handleSelectProject} />
@@ -478,16 +467,8 @@ export const App: React.FC = () => {
               <Loader2 className="w-9 h-9 text-indigo-600 animate-spin" />
               <p className="text-sm text-slate-500 font-medium">Carregando etapas e tarefas do projeto...</p>
             </div>
-          ) : activeProject?.type === 'ACADEMIC' ? (
-            /* Academic Discipline Layout */
-            <AcademicDisciplineView
-              project={activeProject}
-              stages={activeProject.stages || []}
-              tasks={displayedTasks}
-              onOpenCreateTask={handleOpenCreateTask}
-              onOpenCreateStage={() => setIsCreateStageModalOpen(true)}
-              onMoveTask={handleMoveTask}
-            />
+          ) : currentView === 'PROJECT_SPRINTS' ? (
+            <ProjectSprintsView project={activeProject!} />
           ) : (
             /* Active Project Kanban View */
             <KanbanBoard
@@ -549,13 +530,7 @@ export const App: React.FC = () => {
         onAppointmentCreated={() => syncAll(true)}
       />
 
-      {/* Create Deadline Modal */}
-      <CreateDeadlineModal
-        isOpen={isCreateDeadlineModalOpen}
-        onClose={() => setIsCreateDeadlineModalOpen(false)}
-        subjects={academicSubjects}
-        onDeadlineCreated={() => syncAll(true)}
-      />
+
     </div>
   );
 };

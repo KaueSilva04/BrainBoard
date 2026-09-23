@@ -8,6 +8,7 @@ import {
   LayoutGrid,
   Flame,
   Calendar,
+  Milestone,
 } from 'lucide-react';
 import type { Project, ProjectSummary, ActiveView } from '../types';
 
@@ -58,14 +59,21 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   // Navigation tabs definition
   const viewTabs: { id: ActiveView; label: string; icon: React.ReactNode }[] = [
     { id: 'PROJECTS', label: 'Projetos', icon: <FolderKanban className="w-3.5 h-3.5" /> },
-    { 
-      id: 'BOARD', 
-      label: activeProject?.type === 'ACADEMIC' ? 'Plano de Ensino' : 'Quadro Kanban', 
-      icon: <LayoutGrid className="w-3.5 h-3.5" /> 
-    },
-    { id: 'SPRINT', label: 'Visão Global', icon: <Flame className="w-3.5 h-3.5" /> },
-    { id: 'CALENDAR', label: 'Calendário', icon: <Calendar className="w-3.5 h-3.5" /> },
   ];
+
+  if (activeProject) {
+    viewTabs.push({ 
+      id: 'BOARD', 
+      label: 'Quadro Kanban', 
+      icon: <LayoutGrid className="w-3.5 h-3.5" /> 
+    });
+    viewTabs.push({ id: 'PROJECT_SPRINTS', label: 'Sprints', icon: <Milestone className="w-3.5 h-3.5" /> });
+  }
+
+  viewTabs.push(
+    { id: 'SPRINT', label: 'Visão Global', icon: <Flame className="w-3.5 h-3.5" /> },
+    { id: 'CALENDAR', label: 'Calendário', icon: <Calendar className="w-3.5 h-3.5" /> }
+  );
 
   // Contextual title and subtitle
   let viewTitle = 'Dashboard de Projetos';
@@ -74,6 +82,9 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   if (currentView === 'BOARD') {
     viewTitle = activeProject ? activeProject.title : 'Painel de Projeto';
     viewSubtitle = activeProject?.description || 'Acompanhe as tarefas e progresso';
+  } else if (currentView === 'PROJECT_SPRINTS') {
+    viewTitle = `Sprints: ${activeProject?.title || ''}`;
+    viewSubtitle = 'Gerencie as Sprints deste projeto';
   } else if (currentView === 'SPRINT') {
     viewTitle = 'Visão Global';
     viewSubtitle = 'Foco da semana: todas as suas tarefas ativas';

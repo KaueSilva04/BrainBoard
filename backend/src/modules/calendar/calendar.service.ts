@@ -9,29 +9,37 @@ export class CalendarService {
   async getCalendarEvents(filters?: CalendarFilterOptions): Promise<CalendarEventProjection[]> {
     const aptWhere: any = {};
     const taskWhere: any = { dueDate: { not: null } };
+    const assignmentWhere: any = { dueDate: { not: null } };
 
     if (filters?.startDate) {
       const start = parseIsoDate(filters.startDate, 'startDate');
       aptWhere.startTime = { gte: start };
       taskWhere.dueDate = { ...(taskWhere.dueDate || {}), gte: start };
+      assignmentWhere.dueDate = { ...(assignmentWhere.dueDate || {}), gte: start };
     }
 
     if (filters?.endDate) {
       const end = parseIsoDate(filters.endDate, 'endDate');
       aptWhere.endTime = { lte: end };
       taskWhere.dueDate = { ...(taskWhere.dueDate || {}), lte: end };
+      assignmentWhere.dueDate = { ...(assignmentWhere.dueDate || {}), lte: end };
     }
 
     if (filters?.includeCompleted !== true) {
       aptWhere.isCompleted = false;
       taskWhere.status = { not: 'DONE' };
+      assignmentWhere.status = { not: 'DONE' };
     }
 
     if (filters?.projectId) {
       taskWhere.stage = { projectId: filters.projectId };
     }
 
-    const [appointments, tasks] = await Promise.all([
+    if (filters?.subjectId) {
+      assignmentWhere.subjectId = filters.subjectId;
+    }
+
+    const [appointments, tasks, assignments] = await Promise.all([
       prisma.appointment.findMany({
         where: aptWhere,
         orderBy: { startTime: 'asc' },
@@ -44,6 +52,13 @@ export class CalendarService {
               project: true,
             },
           },
+        },
+        orderBy: { dueDate: 'asc' },
+      }),
+      prisma.academicAssignment.findMany({
+        where: assignmentWhere,
+        include: {
+          subject: true,
         },
         orderBy: { dueDate: 'asc' },
       }),
@@ -64,9 +79,8 @@ export class CalendarService {
 
     const taskEvents: CalendarEventProjection[] = tasks.map((t) => {
       const dueDateIso = t.dueDate!.toISOString();
-      const isAcademic = t.stage.project.type === 'ACADEMIC';
       const isDone = t.status === 'DONE';
-      let color = isAcademic ? '#ec4899' : '#3b82f6';
+      let color = '#3b82f6';
       if (isDone) color = '#10b981';
 
       return {
@@ -86,7 +100,28 @@ export class CalendarService {
       };
     });
 
-    const allEvents = [...appointmentEvents, ...taskEvents];
+    const assignmentEvents: CalendarEventProjection[] = assignments.map((a) => {
+      const dueDateIso = a.dueDate!.toISOString();
+      const isDone = a.status === 'DONE';
+      let color = '#ec4899'; // pink color for academic assignments
+      if (isDone) color = '#10b981';
+
+      return {
+        id: `assignment-${a.id}`,
+        sourceId: a.id,
+        sourceType: 'ACADEMIC_ASSIGNMENT',
+        title: `[${a.subject.title}] ${a.title}`,
+        description: a.description,
+        start: dueDateIso,
+        end: dueDateIso,
+        isCompleted: isDone,
+        color,
+        projectTitle: a.subject.title,
+        status: a.status,
+      };
+    });
+
+    const allEvents = [...appointmentEvents, ...taskEvents, ...assignmentEvents];
     allEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
     return allEvents;
   }

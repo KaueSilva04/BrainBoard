@@ -18,11 +18,6 @@ import type {
   CreateAppointmentInput,
   UpdateAppointmentInput,
   CalendarEventProjection,
-  AcademicSubject,
-  CreateAcademicSubjectInput,
-  AcademicDeadlineItem,
-  CreateAcademicDeadlineInput,
-  UpdateAcademicDeadlineInput,
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
@@ -221,6 +216,33 @@ export const tasksApi = {
 };
 
 // ============================================================
+// Sprints API
+// ============================================================
+export const sprintsApi = {
+  list(projectId: string): Promise<import('../types').Sprint[]> {
+    return request(`/api/projects/${projectId}/sprints`);
+  },
+
+  create(projectId: string, input: { title: string; goal?: string; startDate?: string; endDate?: string }): Promise<import('../types').Sprint> {
+    return request(`/api/projects/${projectId}/sprints`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  update(sprintId: string, input: { title?: string; goal?: string; status?: import('../types').SprintStatus; startDate?: string; endDate?: string }): Promise<import('../types').Sprint> {
+    return request(`/api/sprints/${sprintId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    });
+  },
+
+  delete(sprintId: string): Promise<void> {
+    return request(`/api/sprints/${sprintId}`, { method: 'DELETE' });
+  },
+};
+
+// ============================================================
 // Members API
 // ============================================================
 export const membersApi = {
@@ -331,49 +353,41 @@ export const calendarApi = {
 // Academic API
 // ============================================================
 export const academicApi = {
-  listSubjects(): Promise<AcademicSubject[]> {
-    return request('/api/academic/subjects');
+  // Terms
+  listTerms(): Promise<import('../types').AcademicTerm[]> {
+    return request('/api/academic/terms');
+  },
+  createTerm(input: import('../types').CreateAcademicTermInput): Promise<import('../types').AcademicTerm> {
+    return request('/api/academic/terms', { method: 'POST', body: JSON.stringify(input) });
+  },
+  deleteTerm(id: string): Promise<void> {
+    return request(`/api/academic/terms/${id}`, { method: 'DELETE' });
   },
 
-  getSubject(id: string): Promise<AcademicSubject> {
-    return request(`/api/academic/subjects/${id}`);
+  // Subjects
+  listSubjects(termId?: string): Promise<import('../types').AcademicSubject[]> {
+    const qs = termId ? `?termId=${termId}` : '';
+    return request(`/api/academic/subjects${qs}`);
+  },
+  createSubject(input: import('../types').CreateAcademicSubjectInput): Promise<import('../types').AcademicSubject> {
+    return request('/api/academic/subjects', { method: 'POST', body: JSON.stringify(input) });
+  },
+  deleteSubject(id: string): Promise<void> {
+    return request(`/api/academic/subjects/${id}`, { method: 'DELETE' });
   },
 
-  createSubject(input: CreateAcademicSubjectInput): Promise<AcademicSubject> {
-    return request('/api/academic/subjects', {
-      method: 'POST',
-      body: JSON.stringify(input),
-    });
+  // Assignments
+  listAssignments(subjectId?: string): Promise<import('../types').AcademicAssignment[]> {
+    const qs = subjectId ? `?subjectId=${subjectId}` : '';
+    return request(`/api/academic/assignments${qs}`);
   },
-
-  listDeadlines(filters?: {
-    projectId?: string;
-    includeCompleted?: boolean;
-    days?: number;
-  }): Promise<AcademicDeadlineItem[]> {
-    const params = new URLSearchParams();
-    if (filters?.projectId) params.set('projectId', filters.projectId);
-    if (filters?.includeCompleted !== undefined) params.set('includeCompleted', String(filters.includeCompleted));
-    if (filters?.days) params.set('days', String(filters.days));
-    const qs = params.toString();
-    return request(`/api/academic/deadlines${qs ? `?${qs}` : ''}`);
+  createAssignment(input: import('../types').CreateAcademicAssignmentInput): Promise<import('../types').AcademicAssignment> {
+    return request('/api/academic/assignments', { method: 'POST', body: JSON.stringify(input) });
   },
-
-  createDeadline(input: CreateAcademicDeadlineInput): Promise<AcademicDeadlineItem> {
-    return request('/api/academic/deadlines', {
-      method: 'POST',
-      body: JSON.stringify(input),
-    });
+  updateAssignment(id: string, input: import('../types').UpdateAcademicAssignmentInput): Promise<import('../types').AcademicAssignment> {
+    return request(`/api/academic/assignments/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
   },
-
-  updateDeadline(id: string, input: UpdateAcademicDeadlineInput): Promise<AcademicDeadlineItem> {
-    return request(`/api/academic/deadlines/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(input),
-    });
-  },
-
-  deleteDeadline(id: string): Promise<void> {
-    return request(`/api/academic/deadlines/${id}`, { method: 'DELETE' });
+  deleteAssignment(id: string): Promise<void> {
+    return request(`/api/academic/assignments/${id}`, { method: 'DELETE' });
   },
 };

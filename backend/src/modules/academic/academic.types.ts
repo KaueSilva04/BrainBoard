@@ -1,40 +1,49 @@
-export interface AcademicDeadlineItem {
-  id: string;
+import { AcademicTermStatus, AssignmentType, AssignmentStatus } from '@prisma/client';
+
+export interface CreateAcademicTermInput {
   title: string;
-  description: string | null;
-  status: 'TODO' | 'IN_PROGRESS' | 'DONE';
-  dueDate: string; // ISO String
-  daysRemaining: number;
-  isOverdue: boolean;
-  subjectId: string;
-  subjectTitle: string;
-  stageId: string;
-  stageTitle: string;
+  startDate?: string | Date | null;
+  endDate?: string | Date | null;
+  status?: AcademicTermStatus;
+}
+
+export interface UpdateAcademicTermInput {
+  title?: string;
+  startDate?: string | Date | null;
+  endDate?: string | Date | null;
+  status?: AcademicTermStatus;
 }
 
 export interface CreateAcademicSubjectInput {
+  termId: string;
   title: string;
-  description?: string | null | undefined;
-  businessLogic?: string | null | undefined;
-  settings?: any | undefined;
+  description?: string | null;
+  professor?: string | null;
+  colorCode?: string | null;
 }
 
-export interface CreateAcademicDeadlineInput {
-  stageId: string;
+export interface UpdateAcademicSubjectInput {
+  title?: string;
+  description?: string | null;
+  professor?: string | null;
+  colorCode?: string | null;
+}
+
+export interface CreateAcademicAssignmentInput {
+  subjectId: string;
   title: string;
-  description?: string | null | undefined;
-  dueDate: string | Date;
+  description?: string | null;
+  dueDate?: string | Date | null;
+  type?: AssignmentType;
+  status?: AssignmentStatus;
+  grade?: number | null;
 }
 
-export interface UpdateAcademicDeadlineInput {
-  title?: string | undefined;
-  description?: string | null | undefined;
-  status?: 'TODO' | 'IN_PROGRESS' | 'DONE' | undefined;
-  dueDate?: string | Date | null | undefined;
-}
-
-export interface AcademicDeadlineFilters {
-  projectId?: string | undefined;
-  includeCompleted?: boolean | undefined;
-  days?: number | undefined;
+export interface UpdateAcademicAssignmentInput {
+  title?: string;
+  description?: string | null;
+  dueDate?: string | Date | null;
+  type?: AssignmentType;
+  status?: AssignmentStatus;
+  grade?: number | null;
 }

@@ -5,8 +5,67 @@
 export type ProjectStatus = 'PLANNING' | 'ACTIVE' | 'COMPLETED';
 export type StageStatus = 'PLANNING' | 'IN_PROGRESS' | 'COMPLETED';
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE';
-export type ProjectType = 'SOFTWARE' | 'ACADEMIC';
-export type ActiveView = 'PROJECTS' | 'BOARD' | 'SPRINT' | 'ACADEMIC' | 'CALENDAR';
+export type ProjectType = 'SOFTWARE';
+export type SprintStatus = 'ACTIVE' | 'COMPLETED' | 'PLANNING';
+export type ActiveView = 'PROJECTS' | 'BOARD' | 'SPRINT' | 'PROJECT_SPRINTS' | 'ACADEMIC' | 'CALENDAR';
+
+// ---- Academic ----
+export type AcademicTermStatus = 'PLANNED' | 'ACTIVE' | 'COMPLETED';
+export type AssignmentType = 'EXAM' | 'HOMEWORK' | 'PROJECT' | 'PRESENTATION' | 'READING' | 'OTHER';
+export type AssignmentStatus = 'TODO' | 'IN_PROGRESS' | 'DONE';
+
+export interface AcademicAssignment {
+  id: string;
+  title: string;
+  description: string | null;
+  dueDate: string | null;
+  type: AssignmentType;
+  status: AssignmentStatus;
+  grade: number | null;
+  subjectId: string;
+  subject?: AcademicSubject;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AcademicSubject {
+  id: string;
+  title: string;
+  description: string | null;
+  professor: string | null;
+  colorCode: string | null;
+  termId: string;
+  term?: AcademicTerm;
+  assignments?: AcademicAssignment[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AcademicTerm {
+  id: string;
+  title: string;
+  startDate: string | null;
+  endDate: string | null;
+  status: AcademicTermStatus;
+  subjects?: AcademicSubject[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+
+// ---- Sprint ------------------------------------------------
+export interface Sprint {
+  id: string;
+  title: string;
+  goal: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  status: SprintStatus;
+  projectId: string;
+  tasks?: Task[];
+  createdAt: string;
+  updatedAt: string;
+}
 
 // ---- Subtask -----------------------------------------------
 export interface Subtask {
@@ -78,6 +137,7 @@ export interface Project {
   githubRepo: string | null;
   settings: Record<string, unknown> | null;
   stages: Stage[];
+  sprints: Sprint[];
   updateLogs: UpdateLog[];
   members: Member[];
   createdAt: string;
@@ -204,46 +264,38 @@ export interface CalendarEventProjection {
   status?: string;
 }
 
-// ---- Academic Domain Types ---------------------------------
-export interface AcademicDeadlineItem {
-  id: string;
+// ---- Academic UI Types -------------------------------------
+export interface CreateAcademicTermInput {
   title: string;
-  description: string | null;
-  status: TaskStatus;
-  dueDate: string; // ISO string
-  daysRemaining: number;
-  isOverdue: boolean;
-  subjectId: string;
-  subjectTitle: string;
-  stageId: string;
-  stageTitle: string;
-}
-
-export interface AcademicSubject extends Project {
-  totalStages?: number;
-  totalDeadlines?: number;
-  pendingDeadlinesCount?: number;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface CreateAcademicSubjectInput {
   title: string;
   description?: string;
-  businessLogic?: string;
-  settings?: Record<string, unknown>;
+  professor?: string;
+  colorCode?: string;
+  termId: string;
 }
 
-export interface CreateAcademicDeadlineInput {
-  stageId: string;
+export interface CreateAcademicAssignmentInput {
   title: string;
   description?: string;
-  dueDate: string;
+  dueDate?: string;
+  type?: AssignmentType;
+  status?: AssignmentStatus;
+  grade?: number;
+  subjectId: string;
 }
 
-export interface UpdateAcademicDeadlineInput {
+export interface UpdateAcademicAssignmentInput {
   title?: string;
-  description?: string | null;
-  status?: TaskStatus;
-  dueDate?: string | null;
+  description?: string;
+  dueDate?: string;
+  type?: AssignmentType;
+  status?: AssignmentStatus;
+  grade?: number;
 }
 
 // ---- UI helpers --------------------------------------------

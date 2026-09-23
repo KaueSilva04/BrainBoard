@@ -10,7 +10,7 @@ import type {
 } from '../projects.types.js';
 
 export const VALID_PROJECT_STATUSES: ProjectStatus[] = ['PLANNING', 'ACTIVE', 'COMPLETED'];
-export const VALID_PROJECT_TYPES: ProjectType[] = ['SOFTWARE', 'ACADEMIC'];
+export const VALID_PROJECT_TYPES: ProjectType[] = ['SOFTWARE'];
 
 export class ProjectService {
   async listProjects(filters?: ProjectFilterOptions): Promise<ProjectWithDetails[]> {

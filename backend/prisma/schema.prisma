@@ -33,7 +33,6 @@ enum Status {
 
 enum ProjectType {
   SOFTWARE
-  ACADEMIC
 }
 
 model Project {
@@ -138,4 +137,65 @@ model Appointment {
   isCompleted    Boolean   @default(false)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+}
+
+enum AcademicTermStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+}
+
+enum AssignmentType {
+  EXAM
+  HOMEWORK
+  PROJECT
+  PRESENTATION
+  READING
+  OTHER
+}
+
+enum AssignmentStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+model AcademicTerm {
+  id        String             @id @default(uuid())
+  title     String
+  startDate DateTime?
+  endDate   DateTime?
+  status    AcademicTermStatus @default(ACTIVE)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  subjects  AcademicSubject[]
+}
+
+model AcademicSubject {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  professor   String?
+  colorCode   String?
+  termId      String
+  term        AcademicTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  assignments AcademicAssignment[]
+}
+
+model AcademicAssignment {
+  id          String           @id @default(uuid())
+  title       String
+  description String?
+  dueDate     DateTime?
+  type        AssignmentType   @default(OTHER)
+  status      AssignmentStatus @default(TODO)
+  grade       Float?
+  subjectId   String
+  subject     AcademicSubject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 }

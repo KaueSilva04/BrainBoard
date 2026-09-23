@@ -1,292 +1,178 @@
 import { prisma } from '../../prisma.js';
 import { ValidationError, NotFoundError } from '../shared/errors.js';
-import { calculateDaysRemaining, parseIsoDate } from '../shared/date.utils.js';
+import { parseIsoDate } from '../shared/date.utils.js';
 import type {
-  AcademicDeadlineItem,
+  CreateAcademicTermInput,
+  UpdateAcademicTermInput,
   CreateAcademicSubjectInput,
-  CreateAcademicDeadlineInput,
-  UpdateAcademicDeadlineInput,
-  AcademicDeadlineFilters,
+  UpdateAcademicSubjectInput,
+  CreateAcademicAssignmentInput,
+  UpdateAcademicAssignmentInput,
 } from './academic.types.js';
 
 export class AcademicService {
-  async listSubjects() {
-    const projects = await prisma.project.findMany({
-      where: { type: 'ACADEMIC' },
+  // --- TERMS ---
+  async listTerms() {
+    return prisma.academicTerm.findMany({
       include: {
-        stages: {
-          orderBy: { order: 'asc' },
+        subjects: {
           include: {
-            tasks: {
-              where: { dueDate: { not: null } },
-              orderBy: { dueDate: 'asc' },
-            },
+            assignments: true,
           },
-        },
-        updateLogs: {
-          orderBy: { createdAt: 'desc' },
         },
       },
       orderBy: { createdAt: 'desc' },
     });
-
-    return projects.map((p) => {
-      const allDeadlines = p.stages.flatMap((s) => s.tasks);
-      const pendingDeadlines = allDeadlines.filter((t) => t.status !== 'DONE');
-      return {
-        ...p,
-        totalStages: p.stages.length,
-        totalDeadlines: allDeadlines.length,
-        pendingDeadlinesCount: pendingDeadlines.length,
-      };
-    });
   }
 
-  async getSubjectById(id: string) {
-    if (!id || typeof id !== 'string') {
-      throw new ValidationError('Subject ID is required');
-    }
-
-    const project = await prisma.project.findFirst({
-      where: { id, type: 'ACADEMIC' },
+  async getTermById(id: string) {
+    if (!id) throw new ValidationError('Term ID is required');
+    const term = await prisma.academicTerm.findUnique({
+      where: { id },
       include: {
-        stages: {
-          orderBy: { order: 'asc' },
-          include: {
-            tasks: {
-              include: { subtasks: true },
-              orderBy: { dueDate: 'asc' },
-            },
-          },
+        subjects: {
+          include: { assignments: true },
         },
-        updateLogs: {
-          orderBy: { createdAt: 'desc' },
-        },
-        members: true,
       },
     });
-
-    if (!project) {
-      throw new NotFoundError('Academic subject not found');
-    }
-
-    return project;
+    if (!term) throw new NotFoundError('Term not found');
+    return term;
   }
 
-  async createSubject(data: CreateAcademicSubjectInput) {
-    if (!data.title || typeof data.title !== 'string' || !data.title.trim()) {
-      throw new ValidationError('Title is required');
-    }
-
-    const subject = await prisma.project.create({
+  async createTerm(data: CreateAcademicTermInput) {
+    if (!data.title?.trim()) throw new ValidationError('Title is required');
+    return prisma.academicTerm.create({
       data: {
         title: data.title.trim(),
-        description: data.description ? String(data.description).trim() : null,
-        businessLogic: data.businessLogic ? String(data.businessLogic) : null,
-        type: 'ACADEMIC',
-        status: 'ACTIVE',
-        settings: data.settings !== undefined ? data.settings : undefined,
-        stages: {
-          create: [
-            { title: 'Matéria & Aulas', order: 1, status: 'PLANNING' },
-            { title: 'Trabalhos & Entregas', order: 2, status: 'IN_PROGRESS' },
-            { title: 'Provas & Avaliações', order: 3, status: 'PLANNING' },
-          ],
-        },
+        startDate: data.startDate ? parseIsoDate(data.startDate, 'startDate') : null,
+        endDate: data.endDate ? parseIsoDate(data.endDate, 'endDate') : null,
+        ...(data.status !== undefined && { status: data.status }),
       },
-      include: {
-        stages: {
-          orderBy: { order: 'asc' },
-          include: { tasks: true },
-        },
-      },
-    });
-
-    return subject;
-  }
-
-  async listDeadlines(filters?: AcademicDeadlineFilters): Promise<AcademicDeadlineItem[]> {
-    const where: any = {
-      dueDate: { not: null },
-      stage: {
-        project: {
-          type: 'ACADEMIC',
-          ...(filters?.projectId ? { id: filters.projectId } : {}),
-        },
-      },
-    };
-
-    if (filters?.includeCompleted !== true) {
-      where.status = { not: 'DONE' };
-    }
-
-    const now = new Date();
-    if (filters?.days && filters.days > 0) {
-      const maxDate = new Date(now.getTime() + filters.days * 24 * 60 * 60 * 1000);
-      where.dueDate = {
-        gte: new Date(now.getTime() - 24 * 60 * 60 * 1000), // Include today
-        lte: maxDate,
-      };
-    }
-
-    const tasks = await prisma.task.findMany({
-      where,
-      include: {
-        stage: {
-          include: {
-            project: true,
-          },
-        },
-      },
-      orderBy: { dueDate: 'asc' },
-    });
-
-    return tasks.map((t) => {
-      const dueDateObj = t.dueDate!;
-      const daysRemaining = calculateDaysRemaining(dueDateObj, now);
-      const isOverdue = now > dueDateObj && t.status !== 'DONE';
-
-      return {
-        id: t.id,
-        title: t.title,
-        description: t.description,
-        status: t.status as 'TODO' | 'IN_PROGRESS' | 'DONE',
-        dueDate: dueDateObj.toISOString(),
-        daysRemaining,
-        isOverdue,
-        subjectId: t.stage.project.id,
-        subjectTitle: t.stage.project.title,
-        stageId: t.stage.id,
-        stageTitle: t.stage.title,
-      };
     });
   }
 
-  async createDeadline(data: CreateAcademicDeadlineInput): Promise<AcademicDeadlineItem> {
-    if (!data.stageId || typeof data.stageId !== 'string') {
-      throw new ValidationError('stageId is required');
-    }
-    if (!data.title || typeof data.title !== 'string' || !data.title.trim()) {
-      throw new ValidationError('Title is required');
-    }
-    const dueDate = parseIsoDate(data.dueDate, 'dueDate');
-
-    const stage = await prisma.stage.findUnique({
-      where: { id: data.stageId },
-      include: { project: true },
-    });
-    if (!stage) {
-      throw new NotFoundError('Stage not found');
-    }
-    if (stage.project.type !== 'ACADEMIC') {
-      throw new ValidationError('Stage must belong to an ACADEMIC subject');
-    }
-
-    const task = await prisma.task.create({
-      data: {
-        stageId: data.stageId,
-        title: data.title.trim(),
-        description: data.description ? String(data.description).trim() : null,
-        dueDate,
-        status: 'TODO',
-      },
-      include: {
-        stage: {
-          include: {
-            project: true,
-          },
-        },
-      },
-    });
-
-    const now = new Date();
-    return {
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      status: task.status as 'TODO' | 'IN_PROGRESS' | 'DONE',
-      dueDate: task.dueDate!.toISOString(),
-      daysRemaining: calculateDaysRemaining(task.dueDate!, now),
-      isOverdue: false,
-      subjectId: task.stage.project.id,
-      subjectTitle: task.stage.project.title,
-      stageId: task.stage.id,
-      stageTitle: task.stage.title,
-    };
-  }
-
-  async updateDeadline(id: string, data: UpdateAcademicDeadlineInput): Promise<AcademicDeadlineItem> {
-    if (!id || typeof id !== 'string') {
-      throw new ValidationError('Deadline ID is required');
-    }
-
-    const updateData: any = {};
-    if (data.title !== undefined) {
-      if (!data.title || typeof data.title !== 'string' || !data.title.trim()) {
-        throw new ValidationError('Title cannot be empty');
-      }
-      updateData.title = data.title.trim();
-    }
-    if (data.description !== undefined) {
-      updateData.description = data.description ? String(data.description).trim() : null;
-    }
-    if (data.status !== undefined) {
-      if (!['TODO', 'IN_PROGRESS', 'DONE'].includes(data.status)) {
-        throw new ValidationError('Invalid status');
-      }
-      updateData.status = data.status;
-    }
-    if (data.dueDate !== undefined) {
-      updateData.dueDate = data.dueDate ? parseIsoDate(data.dueDate, 'dueDate') : null;
-    }
-
+  async updateTerm(id: string, data: UpdateAcademicTermInput) {
+    if (!id) throw new ValidationError('Term ID is required');
     try {
-      const task = await prisma.task.update({
+      return await prisma.academicTerm.update({
         where: { id },
-        data: updateData,
-        include: {
-          stage: {
-            include: {
-              project: true,
-            },
-          },
+        data: {
+          ...(data.title !== undefined && { title: data.title.trim() }),
+          ...(data.startDate !== undefined && { startDate: data.startDate ? parseIsoDate(data.startDate, 'startDate') : null }),
+          ...(data.endDate !== undefined && { endDate: data.endDate ? parseIsoDate(data.endDate, 'endDate') : null }),
+          ...(data.status !== undefined && { status: data.status }),
         },
       });
-
-      const now = new Date();
-      const dueDateObj = task.dueDate || new Date();
-      return {
-        id: task.id,
-        title: task.title,
-        description: task.description,
-        status: task.status as 'TODO' | 'IN_PROGRESS' | 'DONE',
-        dueDate: task.dueDate ? task.dueDate.toISOString() : '',
-        daysRemaining: calculateDaysRemaining(dueDateObj, now),
-        isOverdue: now > dueDateObj && task.status !== 'DONE',
-        subjectId: task.stage.project.id,
-        subjectTitle: task.stage.project.title,
-        stageId: task.stage.id,
-        stageTitle: task.stage.title,
-      };
     } catch (error: any) {
-      if (error && typeof error === 'object' && 'code' in error && error.code === 'P2025') {
-        throw new NotFoundError('Deadline task not found');
-      }
+      if (error.code === 'P2025') throw new NotFoundError('Term not found');
       throw error;
     }
   }
 
-  async deleteDeadline(id: string): Promise<void> {
-    if (!id || typeof id !== 'string') {
-      throw new ValidationError('Deadline ID is required');
-    }
-
+  async deleteTerm(id: string) {
+    if (!id) throw new ValidationError('Term ID is required');
     try {
-      await prisma.task.delete({ where: { id } });
+      await prisma.academicTerm.delete({ where: { id } });
     } catch (error: any) {
-      if (error && typeof error === 'object' && 'code' in error && error.code === 'P2025') {
-        throw new NotFoundError('Deadline task not found');
-      }
+      if (error.code === 'P2025') throw new NotFoundError('Term not found');
+      throw error;
+    }
+  }
+
+  // --- SUBJECTS ---
+  async createSubject(data: CreateAcademicSubjectInput) {
+    if (!data.termId) throw new ValidationError('termId is required');
+    if (!data.title?.trim()) throw new ValidationError('Title is required');
+    
+    const term = await prisma.academicTerm.findUnique({ where: { id: data.termId } });
+    if (!term) throw new NotFoundError('Term not found');
+
+    return prisma.academicSubject.create({
+      data: {
+        termId: data.termId,
+        title: data.title.trim(),
+        description: data.description?.trim() || null,
+        professor: data.professor?.trim() || null,
+        colorCode: data.colorCode?.trim() || null,
+      },
+    });
+  }
+
+  async updateSubject(id: string, data: UpdateAcademicSubjectInput) {
+    if (!id) throw new ValidationError('Subject ID is required');
+    try {
+      return await prisma.academicSubject.update({
+        where: { id },
+        data: {
+          ...(data.title !== undefined && { title: data.title.trim() }),
+          ...(data.description !== undefined && { description: data.description }),
+          ...(data.professor !== undefined && { professor: data.professor }),
+          ...(data.colorCode !== undefined && { colorCode: data.colorCode }),
+        },
+      });
+    } catch (error: any) {
+      if (error.code === 'P2025') throw new NotFoundError('Subject not found');
+      throw error;
+    }
+  }
+
+  async deleteSubject(id: string) {
+    if (!id) throw new ValidationError('Subject ID is required');
+    try {
+      await prisma.academicSubject.delete({ where: { id } });
+    } catch (error: any) {
+      if (error.code === 'P2025') throw new NotFoundError('Subject not found');
+      throw error;
+    }
+  }
+
+  // --- ASSIGNMENTS ---
+  async createAssignment(data: CreateAcademicAssignmentInput) {
+    if (!data.subjectId) throw new ValidationError('subjectId is required');
+    if (!data.title?.trim()) throw new ValidationError('Title is required');
+
+    const subject = await prisma.academicSubject.findUnique({ where: { id: data.subjectId } });
+    if (!subject) throw new NotFoundError('Subject not found');
+
+    return prisma.academicAssignment.create({
+      data: {
+        subjectId: data.subjectId,
+        title: data.title.trim(),
+        description: data.description?.trim() || null,
+        dueDate: data.dueDate ? parseIsoDate(data.dueDate, 'dueDate') : null,
+        ...(data.type !== undefined && { type: data.type }),
+        ...(data.status !== undefined && { status: data.status }),
+        ...(data.grade !== undefined && { grade: data.grade }),
+      },
+    });
+  }
+
+  async updateAssignment(id: string, data: UpdateAcademicAssignmentInput) {
+    if (!id) throw new ValidationError('Assignment ID is required');
+    try {
+      return await prisma.academicAssignment.update({
+        where: { id },
+        data: {
+          ...(data.title !== undefined && { title: data.title.trim() }),
+          ...(data.description !== undefined && { description: data.description }),
+          ...(data.dueDate !== undefined && { dueDate: data.dueDate ? parseIsoDate(data.dueDate, 'dueDate') : null }),
+          ...(data.type !== undefined && { type: data.type }),
+          ...(data.status !== undefined && { status: data.status }),
+          ...(data.grade !== undefined && { grade: data.grade }),
+        },
+      });
+    } catch (error: any) {
+      if (error.code === 'P2025') throw new NotFoundError('Assignment not found');
+      throw error;
+    }
+  }
+
+  async deleteAssignment(id: string) {
+    if (!id) throw new ValidationError('Assignment ID is required');
+    try {
+      await prisma.academicAssignment.delete({ where: { id } });
+    } catch (error: any) {
+      if (error.code === 'P2025') throw new NotFoundError('Assignment not found');
       throw error;
     }
   }

@@ -24,7 +24,7 @@ export interface AppointmentFilterOptions {
 export interface CalendarEventProjection {
   id: string;
   sourceId: string;
-  sourceType: 'APPOINTMENT' | 'TASK_DEADLINE';
+  sourceType: 'APPOINTMENT' | 'TASK_DEADLINE' | 'ACADEMIC_ASSIGNMENT';
   title: string;
   description: string | null;
   start: string; // ISO-8601 string
@@ -43,4 +43,5 @@ export interface CalendarFilterOptions {
   endDate?: Date | string | undefined;
   includeCompleted?: boolean | undefined;
   projectId?: string | undefined;
+  subjectId?: string | undefined;
 }

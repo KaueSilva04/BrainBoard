@@ -12,6 +12,13 @@ projectsRouter.patch('/api/projects/:id/business-logic', controller.updateBusine
 projectsRouter.patch('/api/projects/:id/settings', controller.updateProjectSettings);
 projectsRouter.delete('/api/projects/:id', controller.deleteProject);
 
+// Sprints
+import { sprintController } from './controllers/sprint.controller.js';
+projectsRouter.get('/api/projects/:projectId/sprints', sprintController.getSprints);
+projectsRouter.post('/api/projects/:projectId/sprints', sprintController.createSprint);
+projectsRouter.patch('/api/sprints/:sprintId', sprintController.updateSprint);
+projectsRouter.delete('/api/sprints/:sprintId', sprintController.deleteSprint);
+
 // Stages
 projectsRouter.get('/api/projects/:projectId/stages', controller.listStagesByProject);
 projectsRouter.post('/api/projects/:projectId/stages', controller.createStage);

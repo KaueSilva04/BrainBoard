@@ -27,7 +27,6 @@ export interface NavbarProps {
   selectedCategory?: string;
   onSelectCategory?: (category: string) => void;
   sprintActiveCount?: number;
-  academicCount?: number;
   calendarCount?: number;
   categoryCounts?: {
     ALL?: number;
@@ -48,7 +47,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenCreateModal,
   isConnected = true,
   sprintActiveCount = 0,
-  academicCount = 0,
   calendarCount = 0,
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -164,11 +162,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               <GraduationCap className="w-4 h-4 text-purple-500" />
               <span>Área Acadêmica</span>
             </div>
-            {academicCount > 0 && (
-              <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800">
-                {academicCount}
-              </span>
-            )}
           </button>
 
           {/* 5. Calendário View Button */}

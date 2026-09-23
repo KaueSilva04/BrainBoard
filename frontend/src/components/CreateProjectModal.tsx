@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, FolderKanban, Github, FileText, CheckCircle2, Clock, Sparkles, GraduationCap, Code } from 'lucide-react';
-import type { CreateProjectInput, ProjectStatus, ProjectType } from '../types';
+import { X, Loader2, FolderKanban, Github, FileText, CheckCircle2, Clock, Sparkles } from 'lucide-react';
+import type { CreateProjectInput, ProjectStatus } from '../types';
 import { PROJECT_STATUS_LABELS } from '../types';
 
 export interface CreateProjectModalProps {
@@ -15,7 +15,6 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   onCreateProject,
 }) => {
   const [title, setTitle] = useState('');
-  const [projectType, setProjectType] = useState<ProjectType>('SOFTWARE');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<ProjectStatus>('ACTIVE');
   const [githubRepo, setGithubRepo] = useState('');
@@ -26,7 +25,6 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setTitle('');
-      setProjectType('SOFTWARE');
       setDescription('');
       setStatus('ACTIVE');
       setGithubRepo('');
@@ -61,7 +59,6 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
         title: cleanTitle,
         description: description.trim() || undefined,
         status,
-        type: projectType,
         githubRepo: githubRepo.trim() || undefined,
         businessLogic: businessLogic.trim() || undefined,
       });
@@ -162,61 +159,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             />
           </div>
 
-          {/* Project Type Selector */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700">
-              Tipo de Projeto
-            </label>
-            <div className="grid grid-cols-2 gap-2.5">
-              <label className="cursor-pointer">
-                <input
-                  type="radio"
-                  name="projectType"
-                  value="SOFTWARE"
-                  checked={projectType === 'SOFTWARE'}
-                  onChange={() => setProjectType('SOFTWARE')}
-                  className="sr-only"
-                />
-                <div
-                  className={`flex items-center gap-2.5 p-3 rounded-2xl border text-xs font-semibold transition-all ${
-                    projectType === 'SOFTWARE'
-                      ? 'border-indigo-400 ring-2 ring-indigo-400/20 bg-indigo-50/80 text-indigo-800 shadow-xs'
-                      : 'border-slate-200/80 bg-slate-50/70 text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  <Code className="w-4 h-4 text-indigo-600 shrink-0" />
-                  <div>
-                    <div className="font-bold">Software / Produto</div>
-                    <div className="text-[10px] text-slate-400 font-normal">Kanban de desenvolvimento</div>
-                  </div>
-                </div>
-              </label>
 
-              <label className="cursor-pointer">
-                <input
-                  type="radio"
-                  name="projectType"
-                  value="ACADEMIC"
-                  checked={projectType === 'ACADEMIC'}
-                  onChange={() => setProjectType('ACADEMIC')}
-                  className="sr-only"
-                />
-                <div
-                  className={`flex items-center gap-2.5 p-3 rounded-2xl border text-xs font-semibold transition-all ${
-                    projectType === 'ACADEMIC'
-                      ? 'border-purple-400 ring-2 ring-purple-400/20 bg-purple-50/80 text-purple-800 shadow-xs'
-                      : 'border-slate-200/80 bg-slate-50/70 text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  <GraduationCap className="w-4 h-4 text-purple-600 shrink-0" />
-                  <div>
-                    <div className="font-bold">Acadêmico / Faculdade</div>
-                    <div className="text-[10px] text-slate-400 font-normal">Entregas, provas e matérias</div>
-                  </div>
-                </div>
-              </label>
-            </div>
-          </div>
 
           {/* Status Selector */}
           <div className="space-y-1.5">
