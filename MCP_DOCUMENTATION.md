@@ -139,7 +139,22 @@ Se o Codex ou a IA estiver fora da rede local (ex: VM remota, cloud runner):
 
 ### 📌 Gestão de Projetos e Contexto
 
-#### 1. `read_project_context`
+#### 1. `list_projects`
+Lista todos os projetos disponíveis, retornando seus IDs, títulos e descrições. (Útil para a IA descobrir o `projectId` que precisa usar).
+
+#### 2. `create_project`
+Cria um novo projeto.
+* **Argumentos:**
+  * `title` *(string, obrigatório)*: Título do projeto.
+  * `description` *(string, opcional)*: Descrição do projeto.
+
+#### 3. `create_stage`
+Cria uma nova etapa (coluna) no Kanban de um projeto.
+* **Argumentos:**
+  * `projectId` *(string, obrigatório)*: UUID do projeto.
+  * `title` *(string, obrigatório)*: Nome da etapa (ex: Backlog, Fazendo).
+
+#### 4. `read_project_context`
 Carrega a visão 360° do projeto para a IA: regras de negócio, repositório GitHub, configurações, etapas, tarefas, subtarefas, membros e diários de bordo.
 * **Argumentos:**
   * `projectId` *(string, obrigatório)*: UUID do projeto.
@@ -148,13 +163,13 @@ Carrega a visão 360° do projeto para a IA: regras de negócio, repositório Gi
   { "projectId": "98d7eb43-ef20-44c9-bc70-161f7bb8f9b1" }
   ```
 
-#### 2. `update_business_logic`
+#### 5. `update_business_logic`
 Atualiza a especificação de arquitetura e regras de negócio do projeto em Markdown.
 * **Argumentos:**
   * `projectId` *(string, obrigatório)*: UUID do projeto.
   * `businessLogic` *(string, obrigatório)*: Conteúdo completo em Markdown.
 
-#### 3. `update_project_settings`
+#### 6. `update_project_settings`
 Atualiza configurações JSON dinâmicas, URL do repositório GitHub e/ou documentação.
 * **Argumentos:**
   * `projectId` *(string, obrigatório)*: UUID do projeto.
@@ -162,7 +177,7 @@ Atualiza configurações JSON dinâmicas, URL do repositório GitHub e/ou docume
   * `settings` *(object, opcional)*: Objeto JSON com configurações (stack, portas, etc.).
   * `businessLogic` *(string, opcional)*: Texto em Markdown.
 
-#### 4. `log_project_update`
+#### 7. `log_project_update`
 Gera uma entrada no Diário de Bordo do projeto com data, autor e formatação Markdown.
 * **Argumentos:**
   * `projectId` *(string, obrigatório)*: UUID do projeto.
@@ -174,7 +189,7 @@ Gera uma entrada no Diário de Bordo do projeto com data, autor e formatação M
 
 ### 📋 Gestão de Tarefas (Kanban)
 
-#### 5. `create_task` *(Alias: `add_task`)*
+#### 8. `create_task` *(Alias: `add_task`)*
 Cria uma nova tarefa associada a uma etapa (*Stage*).
 * **Argumentos:**
   * `stageId` *(string, obrigatório)*: UUID da etapa à qual a tarefa pertence.
@@ -182,14 +197,14 @@ Cria uma nova tarefa associada a uma etapa (*Stage*).
   * `description` *(string, opcional)*: Descrição detalhada.
   * `status` *(string, opcional)*: `'TODO'`, `'IN_PROGRESS'` ou `'DONE'`. Padrão: `'TODO'`.
 
-#### 6. `move_task` *(Alias: `update_task_status`)*
+#### 9. `move_task` *(Alias: `update_task_status`)*
 Altera o status de uma tarefa no Kanban ou move-a para outra etapa.
 * **Argumentos:**
   * `id` *(string, obrigatório)*: UUID da tarefa.
   * `status` *(string, obrigatório)*: `'TODO'`, `'IN_PROGRESS'` ou `'DONE'`.
   * `stageId` *(string, opcional)*: UUID da nova etapa (se estiver movendo de etapa).
 
-#### 7. `update_task`
+#### 10. `update_task`
 Atualiza metadados de uma tarefa existente (título, descrição, status ou etapa).
 * **Argumentos:**
   * `id` *(string, obrigatório)*: UUID da tarefa.
@@ -198,17 +213,17 @@ Atualiza metadados de uma tarefa existente (título, descrição, status ou etap
   * `status` *(string, opcional)*
   * `stageId` *(string, opcional)*
 
-#### 8. `delete_task`
+#### 11. `delete_task`
 Remove uma tarefa e deleta automaticamente todas as suas subtarefas em cascata.
 * **Argumentos:**
   * `id` *(string, obrigatório)*: UUID da tarefa.
 
-#### 9. `get_task`
+#### 12. `get_task`
 Obtém os detalhes completos de uma tarefa específica e sua lista de subtarefas.
 * **Argumentos:**
   * `id` *(string, obrigatório)*: UUID da tarefa.
 
-#### 10. `list_tasks`
+#### 13. `list_tasks`
 Filtra e lista tarefas cadastradas.
 * **Argumentos:**
   * `stageId` *(string, opcional)*: Filtra por etapa.
@@ -218,19 +233,19 @@ Filtra e lista tarefas cadastradas.
 
 ### ☑️ Gestão de Subtarefas (Checklist)
 
-#### 11. `add_subtask`
+#### 14. `add_subtask`
 Adiciona um item de checklist a uma tarefa.
 * **Argumentos:**
   * `taskId` *(string, obrigatório)*: UUID da tarefa pai.
   * `title` *(string, obrigatório)*: Texto do item.
 
-#### 12. `toggle_subtask`
+#### 15. `toggle_subtask`
 Marca ou desmarca uma subtarefa como concluída.
 * **Argumentos:**
   * `id` *(string, obrigatório)*: UUID da subtarefa.
   * `isDone` *(boolean, opcional)*: Se omitido, inverte o estado atual (`true` <-> `false`).
 
-#### 13. `delete_subtask`
+#### 16. `delete_subtask`
 Exclui uma subtarefa específica do checklist.
 * **Argumentos:**
   * `id` *(string, obrigatório)*: UUID da subtarefa.
@@ -239,7 +254,7 @@ Exclui uma subtarefa específica do checklist.
 
 ### 📅 Produtividade e Calendário (M2)
 
-#### 14. `create_appointment`
+#### 17. `create_appointment`
 Cria um novo compromisso com horário de início e término no calendário.
 * **Argumentos:**
   * `title` *(string, obrigatório)*: Título do compromisso.
@@ -248,18 +263,48 @@ Cria um novo compromisso com horário de início e término no calendário.
   * `description` *(string, opcional)*: Descrição detalhada.
   * `locationOrLink` *(string, opcional)*: Local físico ou link da reunião.
 
-#### 15. `list_upcoming_deadlines`
+#### 18. `list_upcoming_deadlines`
 Consulta prazos, entregas e compromissos futuros.
 * **Argumentos:**
   * `days` *(number, opcional)*: Número de dias à frente (padrão: 7).
   * `projectId` *(string, opcional)*: Filtrar por projeto.
   * `includeCompleted` *(boolean, opcional)*: Incluir itens concluídos.
 
-#### 16. `add_to_sprint`
+#### 19. `add_to_sprint`
 Adiciona ou remove uma tarefa da Sprint ativa. (Usa a flag `isSprintActive` simplificada)
 * **Argumentos:**
   * `taskId` *(string, obrigatório)*: UUID da tarefa.
   * `isSprintActive` *(boolean, opcional)*: `true` para adicionar, `false` para remover (padrão: `true`).
+
+---
+
+### 🎓 Área Acadêmica
+
+#### 20. `list_subjects`
+Lista todas as disciplinas acadêmicas cadastradas.
+
+#### 21. `create_subject`
+Cria uma nova disciplina acadêmica.
+* **Argumentos:**
+  * `title` *(string, obrigatório)*: Título da disciplina.
+  * `description` *(string, opcional)*: Descrição da disciplina.
+  * `professor` *(string, opcional)*: Nome do professor responsável.
+  * `colorCode` *(string, opcional)*: Cor em HEX (ex: #3B82F6).
+
+#### 22. `create_assignment`
+Cria uma nova atividade acadêmica para uma disciplina.
+* **Argumentos:**
+  * `subjectId` *(string, obrigatório)*: ID da disciplina.
+  * `title` *(string, obrigatório)*: Título da atividade.
+  * `type` *(string, obrigatório)*: `EXAM`, `HOMEWORK`, `PROJECT`, `PRESENTATION`, `READING`, `OTHER`.
+  * `dueDate` *(string, opcional)*: Data de entrega (ISO-8601).
+  * `status` *(string, opcional)*: `TODO`, `IN_PROGRESS`, `DONE`.
+
+#### 23. `update_assignment_status`
+Atualiza o status de uma atividade acadêmica.
+* **Argumentos:**
+  * `id` *(string, obrigatório)*: ID da atividade.
+  * `status` *(string, obrigatório)*: `TODO`, `IN_PROGRESS`, `DONE`.
 
 ---
 

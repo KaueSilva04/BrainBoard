@@ -1,8 +1,42 @@
 import { projectService } from '../../projects/services/project.service.js';
 import { updateLogService } from '../../projects/services/update-log.service.js';
+import { stageService } from '../../projects/services/stage.service.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 export const projectToolSchemas: Tool[] = [
+  {
+    name: 'list_projects',
+    description: 'Lista todos os projetos disponíveis, retornando seus IDs, títulos e descrições.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'create_project',
+    description: 'Cria um novo projeto.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Título do projeto.' },
+        description: { type: 'string', description: 'Descrição do projeto.' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'create_stage',
+    description: 'Cria uma nova etapa (stage/coluna) dentro de um projeto.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'ID do projeto.' },
+        title: { type: 'string', description: 'Título da etapa (ex: Backlog, Design, Frontend).' },
+      },
+      required: ['projectId', 'title'],
+    },
+  },
   {
     name: 'read_project_context',
     description:
@@ -93,6 +127,48 @@ export const projectToolSchemas: Tool[] = [
 ];
 
 export async function handleProjectTools(name: string, args: any) {
+  if (name === 'list_projects') {
+    const projects = await projectService.listProjects();
+    const mapped = projects.map(p => ({
+      id: p.id,
+      title: p.title,
+      description: p.description,
+      status: p.status,
+    }));
+    return {
+      content: [{ type: 'text' as const, text: JSON.stringify(mapped, null, 2) }],
+    };
+  }
+
+  if (name === 'create_project') {
+    const title = String(args?.title ?? '').trim();
+    if (!title) throw new Error('title é obrigatório');
+    
+    const project = await projectService.createProject({
+      title,
+      description: args?.description ? String(args.description) : undefined,
+    });
+    
+    return {
+      content: [{ type: 'text' as const, text: `Projeto criado com sucesso. ID: ${project.id}` }],
+    };
+  }
+
+  if (name === 'create_stage') {
+    const projectId = String(args?.projectId ?? '').trim();
+    const title = String(args?.title ?? '').trim();
+    if (!projectId || !title) throw new Error('projectId e title são obrigatórios');
+
+    const stage = await stageService.createStage({
+      projectId,
+      title,
+    });
+
+    return {
+      content: [{ type: 'text' as const, text: `Etapa '${stage.title}' criada com sucesso. ID: ${stage.id}` }],
+    };
+  }
+
   if (name === 'read_project_context') {
     const projectId = String(args?.projectId ?? '').trim();
     if (!projectId) {
