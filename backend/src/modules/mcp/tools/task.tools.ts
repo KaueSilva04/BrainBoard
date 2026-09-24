@@ -168,7 +168,7 @@ export async function handleTaskTools(name: string, args: any) {
     });
 
     return {
-      content: [{ type: 'text' as const, text: `Tarefa criada com sucesso: ${task.id}` }],
+      content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: 'Tarefa criada com sucesso.', id: task.id, task }, null, 2) }],
     };
   }
 
@@ -187,7 +187,7 @@ export async function handleTaskTools(name: string, args: any) {
     });
 
     return {
-      content: [{ type: 'text' as const, text: `Tarefa movida para ${task.status}` }],
+      content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: `Tarefa movida para ${task.status}.`, id: task.id, task }, null, 2) }],
     };
   }
 
@@ -202,7 +202,7 @@ export async function handleTaskTools(name: string, args: any) {
     const subtask = await subtaskService.createSubtask(taskId, title);
 
     return {
-      content: [{ type: 'text' as const, text: `Subtarefa criada com sucesso: ${subtask.id}` }],
+      content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: 'Subtarefa criada com sucesso.', id: subtask.id, subtask }, null, 2) }],
     };
   }
 
@@ -219,7 +219,7 @@ export async function handleTaskTools(name: string, args: any) {
       content: [
         {
           type: 'text' as const,
-          text: `Subtarefa ${subtask.id} marcada como ${subtask.isDone ? 'concluída' : 'pendente'}`,
+          text: JSON.stringify({ success: true, message: `Subtarefa ${subtask.id} marcada como ${subtask.isDone ? 'concluída' : 'pendente'}.`, id: subtask.id, subtask }, null, 2),
         },
       ],
     };
@@ -240,7 +240,7 @@ export async function handleTaskTools(name: string, args: any) {
     });
 
     return {
-      content: [{ type: 'text' as const, text: `Tarefa ${task.id} atualizada com sucesso` }],
+      content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: `Tarefa ${task.id} atualizada com sucesso.`, id: task.id, task }, null, 2) }],
     };
   }
 
@@ -253,7 +253,7 @@ export async function handleTaskTools(name: string, args: any) {
     await taskService.deleteTask(id);
 
     return {
-      content: [{ type: 'text' as const, text: `Tarefa ${id} excluída com sucesso` }],
+      content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: `Tarefa ${id} excluída com sucesso.`, id }, null, 2) }],
     };
   }
 
@@ -266,7 +266,7 @@ export async function handleTaskTools(name: string, args: any) {
     await subtaskService.deleteSubtask(id);
 
     return {
-      content: [{ type: 'text' as const, text: `Subtarefa ${id} excluída com sucesso` }],
+      content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: `Subtarefa ${id} excluída com sucesso.`, id }, null, 2) }],
     };
   }
 

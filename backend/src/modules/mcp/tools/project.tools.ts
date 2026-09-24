@@ -150,7 +150,7 @@ export async function handleProjectTools(name: string, args: any) {
     });
     
     return {
-      content: [{ type: 'text' as const, text: `Projeto criado com sucesso. ID: ${project.id}` }],
+      content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: 'Projeto criado com sucesso.', id: project.id, project }, null, 2) }],
     };
   }
 
@@ -165,7 +165,7 @@ export async function handleProjectTools(name: string, args: any) {
     });
 
     return {
-      content: [{ type: 'text' as const, text: `Etapa '${stage.title}' criada com sucesso. ID: ${stage.id}` }],
+      content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: `Etapa '${stage.title}' criada com sucesso.`, id: stage.id, stage }, null, 2) }],
     };
   }
 
@@ -202,7 +202,7 @@ export async function handleProjectTools(name: string, args: any) {
       content: [
         {
           type: 'text' as const,
-          text: `Lógica de negócio do projeto ${projectId} atualizada com sucesso.`,
+          text: JSON.stringify({ success: true, message: `Lógica de negócio do projeto ${projectId} atualizada com sucesso.` }, null, 2),
         },
       ],
     };
@@ -229,7 +229,7 @@ export async function handleProjectTools(name: string, args: any) {
       content: [
         {
           type: 'text' as const,
-          text: `Configurações do projeto ${projectId} atualizadas com sucesso.`,
+          text: JSON.stringify({ success: true, message: `Configurações do projeto ${projectId} atualizadas com sucesso.` }, null, 2),
         },
       ],
     };
@@ -253,7 +253,7 @@ export async function handleProjectTools(name: string, args: any) {
     });
 
     return {
-      content: [{ type: 'text' as const, text: `Log de atualização criado com sucesso: ${log.id}` }],
+      content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: 'Log de atualização criado com sucesso.', id: log.id, log }, null, 2) }],
     };
   }
 

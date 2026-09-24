@@ -75,7 +75,7 @@ export async function handleAcademicTools(name: string, args: any) {
     });
     
     return {
-      content: [{ type: 'text' as const, text: `Disciplina criada com sucesso. ID: ${subject.id}` }],
+      content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: 'Disciplina criada com sucesso.', id: subject.id, subject }, null, 2) }],
     };
   }
 
@@ -95,7 +95,7 @@ export async function handleAcademicTools(name: string, args: any) {
     });
 
     return {
-      content: [{ type: 'text' as const, text: `Atividade '${assignment.title}' criada com sucesso. ID: ${assignment.id}` }],
+      content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: `Atividade '${assignment.title}' criada com sucesso.`, id: assignment.id, assignment }, null, 2) }],
     };
   }
 
@@ -106,7 +106,7 @@ export async function handleAcademicTools(name: string, args: any) {
 
     const assignment = await academicService.updateAssignment(id, { status: status as any });
     return {
-      content: [{ type: 'text' as const, text: `Status atualizado com sucesso. Novo status: ${assignment.status}` }],
+      content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: 'Status atualizado com sucesso.', id: assignment.id, status: assignment.status, assignment }, null, 2) }],
     };
   }
 

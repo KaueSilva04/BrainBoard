@@ -81,7 +81,7 @@ export async function handleM2Tools(name: string, args: any) {
       content: [
         {
           type: 'text' as const,
-          text: `Compromisso agendado com sucesso: ${apt.id} — "${apt.title}" de ${apt.startTime.toISOString()} até ${apt.endTime.toISOString()}`,
+          text: JSON.stringify({ success: true, message: `Compromisso agendado com sucesso.`, id: apt.id, appointment: apt }, null, 2),
         },
       ],
     };
@@ -156,9 +156,7 @@ export async function handleM2Tools(name: string, args: any) {
       content: [
         {
           type: 'text' as const,
-          text: `Tarefa ${task.id} ${
-            task.isSprintActive ? 'adicionada à' : 'removida da'
-          } Sprint ativa com sucesso.`,
+          text: JSON.stringify({ success: true, message: `Tarefa ${task.id} ${task.isSprintActive ? 'adicionada à' : 'removida da'} Sprint ativa com sucesso.`, id: task.id, task }, null, 2),
         },
       ],
     };
