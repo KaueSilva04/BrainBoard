@@ -128,7 +128,9 @@ export const taskToolSchemas: Tool[] = [
       type: 'object',
       properties: {
         stageId: { type: 'string', description: 'Filtrar por ID da etapa.' },
+        projectId: { type: 'string', description: 'Filtrar tarefas pelo ID do projeto.' },
         status: { type: 'string', enum: ['TODO', 'IN_PROGRESS', 'DONE'] },
+        isSprintActive: { type: 'boolean', description: 'Listar apenas tarefas que estão na Sprint Semanal (true) ou apenas as que não estão (false).' },
       },
     },
   },
@@ -271,7 +273,9 @@ export async function handleTaskTools(name: string, args: any) {
   if (name === 'list_tasks') {
     const filters: any = {};
     if (args?.stageId) filters.stageId = String(args.stageId).trim();
+    if (args?.projectId) filters.projectId = String(args.projectId).trim();
     if (args?.status) filters.status = args.status;
+    if (args?.isSprintActive !== undefined) filters.isSprintActive = Boolean(args.isSprintActive);
 
     const tasks = await taskService.listTasks(filters);
 

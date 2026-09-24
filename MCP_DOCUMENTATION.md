@@ -227,7 +227,9 @@ Obtém os detalhes completos de uma tarefa específica e sua lista de subtarefas
 Filtra e lista tarefas cadastradas.
 * **Argumentos:**
   * `stageId` *(string, opcional)*: Filtra por etapa.
+  * `projectId` *(string, opcional)*: Filtra por projeto.
   * `status` *(string, opcional)*: Filtra por `'TODO'`, `'IN_PROGRESS'` ou `'DONE'`.
+  * `isSprintActive` *(boolean, opcional)*: Traz apenas tarefas na Sprint Semanal (`true`) ou fora dela (`false`).
 
 ---
 
