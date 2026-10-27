@@ -1,6 +1,52 @@
 import { taskService } from '../../projects/services/task.service.js';
 import { subtaskService } from '../../projects/services/subtask.service.js';
+import { collaboratorService } from '../../projects/services/collaborator.service.js';
+import { prisma } from '../../../prisma.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+
+async function assertProjectAccess(projectId: string, userId?: string) {
+  if (!userId) return;
+  const hasAccess = await collaboratorService.isMemberOrOwner(projectId, userId);
+  if (!hasAccess) {
+    throw new Error('Acesso negado: você não é proprietário nem colaborador deste projeto');
+  }
+}
+
+async function assertStageAccess(stageId: string, userId?: string) {
+  if (!userId) return;
+  const stage = await prisma.stage.findUnique({
+    where: { id: stageId },
+    select: { projectId: true },
+  });
+  if (!stage) {
+    throw new Error('Etapa não encontrada');
+  }
+  await assertProjectAccess(stage.projectId, userId);
+}
+
+async function assertTaskAccess(taskId: string, userId?: string) {
+  if (!userId) return;
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { stage: { select: { projectId: true } } },
+  });
+  if (!task) {
+    throw new Error('Tarefa não encontrada');
+  }
+  await assertProjectAccess(task.stage.projectId, userId);
+}
+
+async function assertSubtaskAccess(subtaskId: string, userId?: string) {
+  if (!userId) return;
+  const subtask = await prisma.subtask.findUnique({
+    where: { id: subtaskId },
+    select: { task: { select: { stage: { select: { projectId: true } } } } },
+  });
+  if (!subtask) {
+    throw new Error('Subtarefa não encontrada');
+  }
+  await assertProjectAccess(subtask.task.stage.projectId, userId);
+}
 
 export const taskToolSchemas: Tool[] = [
   {
@@ -14,6 +60,7 @@ export const taskToolSchemas: Tool[] = [
         description: { type: 'string', description: 'Descrição detalhada da tarefa.' },
         status: { type: 'string', enum: ['TODO', 'IN_PROGRESS', 'DONE'], description: 'Status inicial.' },
         isSprintActive: { type: 'boolean', description: 'Se a tarefa deve ser incluída na Sprint atual ativa.' },
+        assigneeId: { type: 'string', description: 'ID opcional do usuário colaborador/proprietário responsável pela tarefa.' },
       },
       required: ['stageId', 'title'],
     },
@@ -29,6 +76,7 @@ export const taskToolSchemas: Tool[] = [
         description: { type: 'string', description: 'Descrição detalhada da tarefa.' },
         status: { type: 'string', enum: ['TODO', 'IN_PROGRESS', 'DONE'], description: 'Status inicial.' },
         isSprintActive: { type: 'boolean', description: 'Se a tarefa deve ser incluída na Sprint atual ativa.' },
+        assigneeId: { type: 'string', description: 'ID opcional do usuário colaborador/proprietário responsável pela tarefa.' },
       },
       required: ['stageId', 'title'],
     },
@@ -95,6 +143,7 @@ export const taskToolSchemas: Tool[] = [
         status: { type: 'string', enum: ['TODO', 'IN_PROGRESS', 'DONE'], description: 'Novo status.' },
         stageId: { type: 'string', description: 'ID da nova etapa.' },
         isSprintActive: { type: 'boolean', description: 'Adicionar ou remover da Sprint ativa.' },
+        assigneeId: { type: 'string', description: 'ID do colaborador/proprietário responsável (ou string vazia para desatribuir).' },
       },
       required: ['id'],
     },
@@ -147,7 +196,7 @@ export const taskToolSchemas: Tool[] = [
   },
 ];
 
-export async function handleTaskTools(name: string, args: any) {
+export async function handleTaskTools(name: string, args: any, userId?: string) {
   if (name === 'create_task' || name === 'add_task') {
     const stageId = String(args?.stageId ?? '').trim();
     const title = String(args?.title ?? '').trim();
@@ -159,12 +208,15 @@ export async function handleTaskTools(name: string, args: any) {
       throw new Error('title é obrigatório');
     }
 
+    await assertStageAccess(stageId, userId);
+
     const task = await taskService.createTask({
       stageId,
       title,
       description: args?.description ? String(args.description).trim() : null,
       status: args?.status,
       isSprintActive: args?.isSprintActive !== undefined ? Boolean(args.isSprintActive) : undefined,
+      assigneeId: args?.assigneeId ? String(args.assigneeId).trim() : undefined,
     });
 
     return {
@@ -179,6 +231,11 @@ export async function handleTaskTools(name: string, args: any) {
 
     if (!id || !status) {
       throw new Error('id e status são obrigatórios');
+    }
+
+    await assertTaskAccess(id, userId);
+    if (stageId) {
+      await assertStageAccess(stageId, userId);
     }
 
     const task = await taskService.updateTask(id, {
@@ -199,6 +256,8 @@ export async function handleTaskTools(name: string, args: any) {
       throw new Error('taskId e title são obrigatórios');
     }
 
+    await assertTaskAccess(taskId, userId);
+
     const subtask = await subtaskService.createSubtask(taskId, title);
 
     return {
@@ -211,6 +270,8 @@ export async function handleTaskTools(name: string, args: any) {
     if (!id) {
       throw new Error('id é obrigatório');
     }
+
+    await assertSubtaskAccess(id, userId);
 
     const isDone = typeof args?.isDone === 'boolean' ? args.isDone : undefined;
     const subtask = await subtaskService.toggleSubtask(id, isDone);
@@ -231,12 +292,18 @@ export async function handleTaskTools(name: string, args: any) {
       throw new Error('id é obrigatório');
     }
 
+    await assertTaskAccess(id, userId);
+    if (args?.stageId) {
+      await assertStageAccess(String(args.stageId).trim(), userId);
+    }
+
     const task = await taskService.updateTask(id, {
       title: args?.title ? String(args.title).trim() : undefined,
       description: args?.description !== undefined ? (args.description ? String(args.description).trim() : null) : undefined,
       status: args?.status,
       stageId: args?.stageId ? String(args.stageId).trim() : undefined,
       isSprintActive: args?.isSprintActive !== undefined ? Boolean(args.isSprintActive) : undefined,
+      assigneeId: args?.assigneeId !== undefined ? (args.assigneeId ? String(args.assigneeId).trim() : null) : undefined,
     });
 
     return {
@@ -249,6 +316,8 @@ export async function handleTaskTools(name: string, args: any) {
     if (!id) {
       throw new Error('id é obrigatório');
     }
+
+    await assertTaskAccess(id, userId);
 
     await taskService.deleteTask(id);
 
@@ -263,6 +332,8 @@ export async function handleTaskTools(name: string, args: any) {
       throw new Error('id é obrigatório');
     }
 
+    await assertSubtaskAccess(id, userId);
+
     await subtaskService.deleteSubtask(id);
 
     return {
@@ -272,10 +343,17 @@ export async function handleTaskTools(name: string, args: any) {
 
   if (name === 'list_tasks') {
     const filters: any = {};
-    if (args?.stageId) filters.stageId = String(args.stageId).trim();
-    if (args?.projectId) filters.projectId = String(args.projectId).trim();
+    if (args?.stageId) {
+      filters.stageId = String(args.stageId).trim();
+      await assertStageAccess(filters.stageId, userId);
+    }
+    if (args?.projectId) {
+      filters.projectId = String(args.projectId).trim();
+      await assertProjectAccess(filters.projectId, userId);
+    }
     if (args?.status) filters.status = args.status;
     if (args?.isSprintActive !== undefined) filters.isSprintActive = Boolean(args.isSprintActive);
+    if (userId) filters.userId = userId;
 
     const tasks = await taskService.listTasks(filters);
 
@@ -289,6 +367,8 @@ export async function handleTaskTools(name: string, args: any) {
     if (!id) {
       throw new Error('id é obrigatório');
     }
+
+    await assertTaskAccess(id, userId);
 
     const task = await taskService.getTaskById(id);
     if (!task) {

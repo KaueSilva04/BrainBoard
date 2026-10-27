@@ -1,6 +1,7 @@
 import { projectService } from '../../projects/services/project.service.js';
 import { updateLogService } from '../../projects/services/update-log.service.js';
 import { stageService } from '../../projects/services/stage.service.js';
+import { collaboratorService } from '../../projects/services/collaborator.service.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 export const projectToolSchemas: Tool[] = [
@@ -124,16 +125,58 @@ export const projectToolSchemas: Tool[] = [
       required: ['projectId', 'title', 'content'],
     },
   },
+  {
+    name: 'list_project_collaborators',
+    description:
+      'Lista o proprietário (OWNER) e todos os colaboradores (COLLABORATOR) com acesso ao projeto, retornando seus userIds, nomes e e-mails.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'ID do projeto.' },
+      },
+      required: ['projectId'],
+    },
+  },
+  {
+    name: 'add_project_collaborator',
+    description:
+      'Adiciona um usuário registrado como colaborador (COLLABORATOR) de um projeto pelo e-mail ou userId (apenas o proprietário pode adicionar).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'ID do projeto.' },
+        email: { type: 'string', description: 'E-mail do usuário registrado a adicionar.' },
+        userId: { type: 'string', description: 'ID do usuário registrado a adicionar (alternativa ao email).' },
+      },
+      required: ['projectId'],
+    },
+  },
+  {
+    name: 'remove_project_collaborator',
+    description:
+      'Remove um colaborador de um projeto e desatribui suas tarefas naquele projeto.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'ID do projeto.' },
+        userId: { type: 'string', description: 'ID do usuário colaborador a remover.' },
+      },
+      required: ['projectId', 'userId'],
+    },
+  },
 ];
 
-export async function handleProjectTools(name: string, args: any) {
+export async function handleProjectTools(name: string, args: any, userId?: string) {
   if (name === 'list_projects') {
-    const projects = await projectService.listProjects();
+    const projects = await projectService.listProjects({ userId });
     const mapped = projects.map(p => ({
       id: p.id,
       title: p.title,
       description: p.description,
       status: p.status,
+      ownerId: (p as any).ownerId ?? null,
+      owner: (p as any).owner ?? null,
+      collaboratorsCount: Array.isArray((p as any).collaborators) ? (p as any).collaborators.length : 0,
     }));
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(mapped, null, 2) }],
@@ -147,6 +190,7 @@ export async function handleProjectTools(name: string, args: any) {
     const project = await projectService.createProject({
       title,
       description: args?.description ? String(args.description) : undefined,
+      ownerId: userId,
     });
     
     return {
@@ -158,6 +202,13 @@ export async function handleProjectTools(name: string, args: any) {
     const projectId = String(args?.projectId ?? '').trim();
     const title = String(args?.title ?? '').trim();
     if (!projectId || !title) throw new Error('projectId e title são obrigatórios');
+
+    if (userId) {
+      const hasAccess = await collaboratorService.isMemberOrOwner(projectId, userId);
+      if (!hasAccess) {
+        throw new Error('Acesso negado: você não é proprietário nem colaborador deste projeto');
+      }
+    }
 
     const stage = await stageService.createStage({
       projectId,
@@ -175,11 +226,11 @@ export async function handleProjectTools(name: string, args: any) {
       throw new Error('projectId é obrigatório');
     }
 
-    const project = await projectService.getProjectById(projectId);
+    const project = await projectService.getProjectById(projectId, userId);
     if (!project) {
       return {
         isError: true,
-        content: [{ type: 'text' as const, text: `Projeto não encontrado com o ID: ${projectId}` }],
+        content: [{ type: 'text' as const, text: `Projeto não encontrado ou sem permissão de acesso para o ID: ${projectId}` }],
       };
     }
 
@@ -196,7 +247,7 @@ export async function handleProjectTools(name: string, args: any) {
       throw new Error('projectId é obrigatório');
     }
 
-    await projectService.updateBusinessLogic(projectId, businessLogic);
+    await projectService.updateBusinessLogic(projectId, businessLogic, userId);
 
     return {
       content: [
@@ -214,16 +265,20 @@ export async function handleProjectTools(name: string, args: any) {
       throw new Error('projectId é obrigatório');
     }
 
-    await projectService.updateProjectSettings(projectId, {
-      githubRepo:
-        args?.githubRepo !== undefined
-          ? args.githubRepo
-            ? String(args.githubRepo).trim()
-            : null
-          : undefined,
-      settings: args?.settings !== undefined ? args.settings : undefined,
-      businessLogic: args?.businessLogic !== undefined ? String(args.businessLogic) : undefined,
-    });
+    await projectService.updateProjectSettings(
+      projectId,
+      {
+        githubRepo:
+          args?.githubRepo !== undefined
+            ? args.githubRepo
+              ? String(args.githubRepo).trim()
+              : null
+            : undefined,
+        settings: args?.settings !== undefined ? args.settings : undefined,
+        businessLogic: args?.businessLogic !== undefined ? String(args.businessLogic) : undefined,
+      },
+      userId
+    );
 
     return {
       content: [
@@ -245,6 +300,13 @@ export async function handleProjectTools(name: string, args: any) {
       throw new Error('projectId, title e content são obrigatórios');
     }
 
+    if (userId) {
+      const hasAccess = await collaboratorService.isMemberOrOwner(projectId, userId);
+      if (!hasAccess) {
+        throw new Error('Acesso negado: você não é proprietário nem colaborador deste projeto');
+      }
+    }
+
     const log = await updateLogService.createLog({
       projectId,
       title,
@@ -254,6 +316,48 @@ export async function handleProjectTools(name: string, args: any) {
 
     return {
       content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: 'Log de atualização criado com sucesso.', id: log.id, log }, null, 2) }],
+    };
+  }
+
+  if (name === 'list_project_collaborators') {
+    const projectId = String(args?.projectId ?? '').trim();
+    if (!projectId) throw new Error('projectId é obrigatório');
+
+    const collaborators = await collaboratorService.getProjectCollaborators(projectId, userId);
+    return {
+      content: [{ type: 'text' as const, text: JSON.stringify(collaborators, null, 2) }],
+    };
+  }
+
+  if (name === 'add_project_collaborator') {
+    const projectId = String(args?.projectId ?? '').trim();
+    if (!projectId) throw new Error('projectId é obrigatório');
+    if (!userId) throw new Error('Autenticação necessária para adicionar colaborador');
+
+    const collaborator = await collaboratorService.addCollaborator(projectId, userId, {
+      ...(args?.email ? { email: String(args.email).trim() } : {}),
+      ...(args?.userId ? { userId: String(args.userId).trim() } : {}),
+    });
+
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: JSON.stringify({ success: true, message: 'Colaborador adicionado com sucesso.', collaborator }, null, 2),
+        },
+      ],
+    };
+  }
+
+  if (name === 'remove_project_collaborator') {
+    const projectId = String(args?.projectId ?? '').trim();
+    const targetUserId = String(args?.userId ?? '').trim();
+    if (!projectId || !targetUserId) throw new Error('projectId e userId são obrigatórios');
+    if (!userId) throw new Error('Autenticação necessária para remover colaborador');
+
+    const result = await collaboratorService.removeCollaborator(projectId, userId, targetUserId);
+    return {
+      content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
     };
   }
 
