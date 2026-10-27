@@ -20,14 +20,29 @@ import { tasksApi } from '../../services/api';
 import type { Task, TaskStatus } from '../../types';
 import { AddToSprintModal } from './AddToSprintModal';
 import { SubtaskItem } from '../SubtaskItem';
+import { getInitials } from '../collaborators/AvatarStack';
 
 export interface SprintKanbanViewProps {
   onOpenCreateTask?: () => void;
+  onNavigateToProjects?: () => void;
+  onRetryProjects?: () => void;
+  hasProjectsSnapshot?: boolean;
+  projectsLoadError?: boolean;
+  projectsCount?: number;
   projectId?: string;
 }
 
-export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreateTask, projectId }) => {
+export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({
+  onOpenCreateTask,
+  onNavigateToProjects,
+  onRetryProjects,
+  hasProjectsSnapshot = false,
+  projectsLoadError = false,
+  projectsCount = 0,
+  projectId,
+}) => {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [hasTasksSnapshot, setHasTasksSnapshot] = useState(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -43,12 +58,13 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
   const loadSprintTasks = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      if (!silent) setError(null);
       const data = await tasksApi.listAll({ isSprintActive: true, projectId });
       setTasks(data);
+      setHasTasksSnapshot(true);
+      setError(null);
     } catch (err: any) {
       console.error('Failed to load sprint tasks:', err);
-      if (!silent) setError('Não foi possível carregar as tarefas da sprint semanal.');
+      setError('Não foi possível atualizar as tarefas marcadas para foco.');
     } finally {
       if (!silent) setLoading(false);
     }
@@ -162,6 +178,7 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
   const inProgressCount = tasks.filter((t) => t.status === 'IN_PROGRESS').length;
   const doneCount = tasks.filter((t) => t.status === 'DONE').length;
   const completionRate = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+  const hasVerifiedMetrics = hasTasksSnapshot;
 
   // Search filter
   const filteredTasks = useMemo(() => {
@@ -180,23 +197,23 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
     {
       status: 'TODO',
       label: 'A Fazer',
-      icon: <Clock className="w-4 h-4 text-amber-500" />,
+      icon: <Clock className="w-4 h-4 text-amber-500 dark:text-amber-400" />,
       color: 'border-amber-400',
-      bg: 'bg-amber-50/50',
+      bg: 'bg-amber-50/50 dark:bg-amber-950/50',
     },
     {
       status: 'IN_PROGRESS',
       label: 'Em Andamento',
-      icon: <PlayCircle className="w-4 h-4 text-indigo-500" />,
+      icon: <PlayCircle className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />,
       color: 'border-indigo-400',
-      bg: 'bg-indigo-50/50',
+      bg: 'bg-indigo-50/50 dark:bg-indigo-950/50',
     },
     {
       status: 'DONE',
       label: 'Concluído',
-      icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" />,
+      icon: <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />,
       color: 'border-emerald-400',
-      bg: 'bg-emerald-50/50',
+      bg: 'bg-emerald-50/50 dark:bg-emerald-950/50',
     },
   ];
 
@@ -208,17 +225,17 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
     const diffMs = due.getTime() - now.getTime();
     const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
-    let badgeClass = 'bg-slate-100 text-slate-700 border-slate-200';
+    let badgeClass = 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700';
     let text = `${diffDays} dias restantes`;
 
     if (diffDays < 0) {
-      badgeClass = 'bg-rose-100 text-rose-700 border-rose-200 font-bold';
+      badgeClass = 'bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/70 font-bold';
       text = `Atrasado (${Math.abs(diffDays)}d)`;
     } else if (diffDays === 0) {
-      badgeClass = 'bg-amber-100 text-amber-800 border-amber-200 font-bold';
+      badgeClass = 'bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800/70 font-bold';
       text = 'Entrega hoje!';
     } else if (diffDays === 1) {
-      badgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
+      badgeClass = 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/70';
       text = 'Amanhã';
     }
 
@@ -231,53 +248,48 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="bb-page-stack bb-page-enter motion-reduce:animate-none">
       {/* Top Banner & KPI Section */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-card">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className={`bb-panel ${projectId ? 'p-3 sm:p-6' : 'p-5 sm:p-6'}`}>
+        <div className={`flex flex-col md:flex-row md:items-center justify-between ${projectId ? 'gap-3 sm:gap-6' : 'gap-6'}`}>
           <div className="space-y-1">
             <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20">
-                <Flame className="w-5 h-5" />
+              <div className={`rounded-2xl bg-amber-500 text-white flex items-center justify-center border border-amber-400/40 ${projectId ? 'h-9 w-9 sm:h-10 sm:w-10' : 'h-10 w-10'}`}>
+                <Flame className="h-5 w-5" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                    Visão Global
-                  </h2>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 uppercase tracking-widest">
-                    Foco da Semana
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 font-medium">
-                  Quadro unificado exibindo suas prioridades ativas de todos os projetos
+                <h2 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">
+                  {projectId ? 'Foco do projeto' : 'Foco global'}
+                </h2>
+                <p className="mt-0.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                  {projectId ? 'Tarefas marcadas para foco neste projeto' : 'Tarefas marcadas para foco nos projetos'}
                 </p>
               </div>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={() => loadSprintTasks(false)}
-              title="Atualizar tarefas globais"
-              className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+              title="Atualizar tarefas de foco"
+              className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
 
             <button
               onClick={() => setIsAddToSprintOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-md shadow-amber-500/20 transition-all active:scale-98"
+              className="flex h-10 items-center gap-2 rounded-lg bg-amber-700 px-4 text-xs sm:text-sm font-semibold text-white transition-colors hover:bg-amber-800"
             >
               <Flame className="w-4 h-4" />
-              <span>+ Adicionar à Sprint</span>
+              <span>+ Adicionar ao foco</span>
             </button>
 
-            {onOpenCreateTask && (
+            {projectId && onOpenCreateTask && (
               <button
                 onClick={onOpenCreateTask}
-                className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-500/20 transition-all active:scale-98"
+                className="flex h-10 items-center gap-2 rounded-lg bg-slate-900 px-4 text-xs sm:text-sm font-semibold text-white transition-colors hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
               >
                 <Plus className="w-4 h-4 stroke-[2.5]" />
                 <span>Nova Tarefa</span>
@@ -286,64 +298,103 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
           </div>
         </div>
 
+        {!projectId && (
+          <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4 text-sm text-indigo-950 dark:border-indigo-900/70 dark:bg-indigo-950/40 dark:text-indigo-100 sm:flex-row sm:items-center sm:justify-between">
+            {!hasProjectsSnapshot ? (
+              <>
+                <p role="status" className="min-w-0">
+                  {projectsLoadError
+                    ? 'Os projetos ainda não estão disponíveis. Tente carregar novamente para criar uma tarefa em um projeto.'
+                    : 'Os projetos ainda não foram carregados; eles são necessários para criar uma tarefa.'}
+                </p>
+                {onRetryProjects && (
+                  <button type="button" onClick={onRetryProjects} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-indigo-300 bg-white px-3 font-semibold text-indigo-800 hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-indigo-800 dark:bg-slate-900 dark:text-indigo-200 dark:hover:bg-indigo-950">
+                    <RefreshCw className="h-4 w-4" />Tentar novamente
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="min-w-0">
+                  {projectsCount > 0
+                    ? 'Para criar uma tarefa, escolha um projeto e uma etapa. O foco reúne tarefas já marcadas nos projetos.'
+                    : 'Ainda não há projetos para receber tarefas. Abra Projetos para criar ou selecionar um projeto.'}
+                </p>
+                {onNavigateToProjects && (
+                  <button type="button" onClick={onNavigateToProjects} className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl bg-indigo-700 px-3 font-semibold text-white hover:bg-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:bg-indigo-600 dark:hover:bg-indigo-500 dark:focus-visible:ring-offset-slate-900">
+                    {projectsCount > 0 ? 'Escolher projeto' : 'Abrir projetos'}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         {/* Sprint KPIs Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-slate-100">
-          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/60">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total na Sprint</p>
-            <p className="text-2xl font-black text-slate-900 mt-0.5">{totalCount}</p>
+        {!hasVerifiedMetrics && error ? (
+          <p role="status" className="mt-6 border-t border-slate-100 pt-4 text-sm text-rose-700 dark:border-slate-700 dark:text-rose-300">
+            Métricas indisponíveis até que as tarefas sejam carregadas.
+          </p>
+        ) : (
+        <div className={`grid grid-cols-2 border-t border-slate-100 dark:border-slate-700 ${projectId ? 'gap-2 mt-4 pt-4 sm:gap-4 sm:mt-6 sm:pt-6' : 'gap-4 mt-6 pt-6'} sm:grid-cols-4`}>
+          <div className={`rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 ${projectId ? 'p-2.5 sm:p-3.5' : 'p-3.5'}`}>
+            <p className={`font-medium text-slate-500 dark:text-slate-400 ${projectId ? 'text-[10px] sm:text-[11px]' : 'text-xs'}`}>Total em foco</p>
+            <p className={`bb-tabular font-mono font-black text-slate-900 dark:text-slate-100 mt-0.5 ${projectId ? 'text-xl sm:text-2xl' : 'text-2xl'}`}>{hasVerifiedMetrics ? totalCount : '—'}</p>
           </div>
-          <div className="p-3.5 rounded-2xl bg-amber-50/60 border border-amber-100">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-amber-600">A Fazer</p>
-            <p className="text-2xl font-black text-amber-700 mt-0.5">{todoCount}</p>
+          <div className={`rounded-2xl bg-amber-50/60 dark:bg-amber-950/50 border border-amber-100 dark:border-amber-800/70 ${projectId ? 'p-2.5 sm:p-3.5' : 'p-3.5'}`}>
+            <p className={`font-medium text-amber-600 dark:text-amber-400 ${projectId ? 'text-[10px] sm:text-[11px]' : 'text-xs'}`}>A fazer</p>
+            <p className={`bb-tabular font-mono font-black text-amber-700 dark:text-amber-300 mt-0.5 ${projectId ? 'text-xl sm:text-2xl' : 'text-2xl'}`}>{hasVerifiedMetrics ? todoCount : '—'}</p>
           </div>
-          <div className="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-100">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-600">Em Andamento</p>
-            <p className="text-2xl font-black text-indigo-700 mt-0.5">{inProgressCount}</p>
+          <div className={`rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800/70 ${projectId ? 'p-2.5 sm:p-3.5' : 'p-3.5'}`}>
+            <p className={`font-medium text-indigo-600 dark:text-indigo-400 ${projectId ? 'text-[10px] sm:text-[11px]' : 'text-xs'}`}>Em andamento</p>
+            <p className={`bb-tabular font-mono font-black text-indigo-700 dark:text-indigo-300 mt-0.5 ${projectId ? 'text-xl sm:text-2xl' : 'text-2xl'}`}>{hasVerifiedMetrics ? inProgressCount : '—'}</p>
           </div>
-          <div className="p-3.5 rounded-2xl bg-emerald-50/60 border border-emerald-100">
+          <div className={`rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/50 border border-emerald-100 dark:border-emerald-800/70 ${projectId ? 'p-2.5 sm:p-3.5' : 'p-3.5'}`}>
             <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600">Taxa de Conclusão</p>
-              <span className="text-xs font-black text-emerald-700">{completionRate}%</span>
+              <p className={`font-medium text-emerald-600 dark:text-emerald-400 ${projectId ? 'text-[10px] sm:text-[11px]' : 'text-xs'}`}>Taxa de conclusão</p>
+              <span className="bb-tabular font-mono text-xs font-black text-emerald-700 dark:text-emerald-300">{hasVerifiedMetrics ? `${completionRate}%` : '—'}</span>
             </div>
-            <p className="text-2xl font-black text-emerald-700 mt-0.5">{doneCount} / {totalCount}</p>
-            <div className="w-full bg-emerald-200/60 rounded-full h-1.5 mt-2 overflow-hidden">
+            <p className={`bb-tabular font-mono font-black text-emerald-700 dark:text-emerald-300 mt-0.5 ${projectId ? 'text-xl sm:text-2xl' : 'text-2xl'}`}>{hasVerifiedMetrics ? `${doneCount} / ${totalCount}` : '—'}</p>
+            {hasVerifiedMetrics && <div className="w-full bg-emerald-200/60 dark:bg-emerald-900/50 rounded-full h-1.5 mt-2 overflow-hidden">
               <div
                 className="bg-emerald-600 h-full rounded-full transition-all duration-500"
                 style={{ width: `${completionRate}%` }}
               />
-            </div>
+            </div>}
           </div>
         </div>
+        )}
+        {!hasVerifiedMetrics && loading && <p role="status" className="mt-3 text-xs text-slate-500 dark:text-slate-400">Carregando métricas do quadro de foco…</p>}
       </div>
 
       {/* Filter / Search Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <Search className="w-4 h-4 text-slate-400 dark:text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Filtrar tarefas da sprint..."
-            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all shadow-xs"
+            placeholder="Filtrar tarefas em foco..."
+            className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-colors"
           />
         </div>
 
-        <div className="text-xs font-semibold text-slate-500">
-          Mostrando {filteredTasks.length} {filteredTasks.length === 1 ? 'tarefa' : 'tarefas'}
+        <div className="text-xs font-semibold text-slate-500 dark:text-slate-400" role={!hasTasksSnapshot && error ? 'status' : undefined}>
+          {hasTasksSnapshot ? `Mostrando ${filteredTasks.length} ${filteredTasks.length === 1 ? 'tarefa' : 'tarefas'}` : error ? 'Tarefas indisponíveis' : loading ? 'Carregando tarefas…' : 'Tarefas não carregadas'}
         </div>
       </div>
 
       {/* Error state */}
-      {error && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center justify-between">
+      {error && tasks.length > 0 && (
+        <div role="alert" className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800/70 text-rose-700 dark:text-rose-300 text-xs flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
-          <button
+          <button type="button"
             onClick={() => loadSprintTasks(false)}
-            className="font-bold underline hover:text-rose-800"
+            className="min-h-10 rounded-lg px-2 font-bold underline hover:text-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:hover:text-rose-300"
           >
             Tentar novamente
           </button>
@@ -353,26 +404,31 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
       {/* Kanban Board Columns */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 space-y-3">
-          <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
-          <p className="text-xs text-slate-500 font-medium">Carregando quadro da sprint...</p>
+          <Loader2 className="w-8 h-8 text-amber-500 dark:text-amber-400 animate-spin" />
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Carregando quadro de foco...</p>
+        </div>
+      ) : error && tasks.length === 0 ? (
+        <div role="alert" className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50 p-6 text-center text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+          <p>{error}</p>
+          <button type="button" onClick={() => loadSprintTasks(false)} className="inline-flex min-h-10 items-center gap-2 rounded-xl px-3 font-semibold hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:hover:bg-rose-900"><RefreshCw className="h-4 w-4" />Tentar novamente</button>
         </div>
       ) : totalCount === 0 ? (
-        <div className="bg-white rounded-3xl p-12 text-center border border-dashed border-slate-300 space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto shadow-xs">
+        <div className="bb-panel rounded-2xl p-12 text-center border-dashed space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto border border-amber-200/60 dark:border-amber-800/60">
             <Flame className="w-6 h-6" />
           </div>
           <div className="space-y-1">
-            <h3 className="text-base font-extrabold text-slate-800">Sua Sprint Semanal está vazia</h3>
-            <p className="text-xs text-slate-500 max-w-md mx-auto">
-              Adicione tarefas do backlog dos seus projetos para acompanhar o progresso focado desta semana.
+            <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-200">Nenhuma tarefa marcada para foco</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+              Adicione tarefas do backlog dos seus projetos para reuni-las neste quadro de foco.
             </p>
           </div>
           <button
             onClick={() => setIsAddToSprintOpen(true)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-md shadow-amber-500/20 transition-all"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold rounded-xl border border-amber-600/30 transition-colors motion-reduce:transition-none"
           >
             <Flame className="w-4 h-4" />
-            <span>Adicionar Tarefas do Backlog</span>
+            <span>Adicionar tarefas ao foco</span>
           </button>
         </div>
       ) : (
@@ -383,15 +439,15 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
             return (
               <div
                 key={col.status}
-                className="bg-slate-50/80 rounded-3xl p-4 border border-slate-200/80 flex flex-col min-h-[500px]"
+                className="bb-kanban-column rounded-2xl p-4 flex min-w-0 flex-col min-h-[280px] md:min-h-[500px]"
               >
                 {/* Column Header */}
-                <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/60">
+                <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/60 dark:border-slate-700/60">
                   <div className="flex items-center gap-2">
                     {col.icon}
-                    <h3 className="text-sm font-extrabold text-slate-800">{col.label}</h3>
+                    <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-200">{col.label}</h3>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full text-xs font-black bg-white text-slate-700 shadow-xs border border-slate-200">
+                  <span className="bb-tabular font-mono px-2 py-0.5 rounded-full text-xs font-bold bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                     {colTasks.length}
                   </span>
                 </div>
@@ -399,7 +455,7 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
                 {/* Column Tasks */}
                 <div className="space-y-3 flex-1 overflow-y-auto">
                   {colTasks.length === 0 ? (
-                    <div className="py-12 text-center text-slate-400 text-xs font-medium">
+                    <div className="py-12 text-center text-slate-400 dark:text-slate-400 text-xs font-medium">
                       Nenhuma tarefa neste status
                     </div>
                   ) : (
@@ -413,26 +469,40 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
                       return (
                         <div
                           key={task.id}
-                          className="group bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card hover:shadow-card-hover hover:border-amber-300 transition-all space-y-3"
+                          className="bb-panel bb-card-motion group space-y-3 p-4 hover:border-amber-300 dark:hover:border-amber-800/70"
                         >
                           {/* Card Header: Stage badge + Due Date & Remove button */}
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex flex-wrap items-center gap-1.5">
                               {task.stage?.title && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800/70">
                                   <Layers className="w-3 h-3" />
                                   <span className="truncate max-w-[120px]">{task.stage.title}</span>
                                 </span>
                               )}
                               {renderDueDateBadge(task.dueDate)}
+                              {task.assignee && (
+                                <span
+                                  className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-700 dark:text-slate-300"
+                                  title={`Responsável: ${task.assignee.name}`}
+                                >
+                                  <span
+                                    className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-bold text-white"
+                                    style={{ backgroundColor: task.assignee.avatarColor || '#334155' }}
+                                  >
+                                    {getInitials(task.assignee.name)}
+                                  </span>
+                                  <span className="truncate max-w-[80px]">{task.assignee.name.split(' ')[0]}</span>
+                                </span>
+                              )}
                             </div>
 
                             <button
                               type="button"
                               onClick={() => handleRemoveFromSprint(task.id)}
                               disabled={isRemoving}
-                              title="Remover da Sprint Semanal"
-                              className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1 rounded-lg transition-colors"
+                              title="Remover do foco"
+                              className="text-slate-400 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 p-1 rounded-lg transition-colors"
                             >
                               {isRemoving ? (
                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -447,26 +517,26 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
                             <h4
                               className={`text-sm font-bold leading-snug ${
                                 task.status === 'DONE'
-                                  ? 'text-slate-400 line-through font-normal'
-                                  : 'text-slate-900'
+                                  ? 'text-slate-400 dark:text-slate-400 line-through font-normal'
+                                  : 'text-slate-900 dark:text-slate-100'
                               }`}
                             >
                               {task.title}
                             </h4>
                             {task.description && (
-                              <p className="mt-1 text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
                                 {task.description}
                               </p>
                             )}
                           </div>
 
                           {/* Subtasks Progress */}
-                          <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                          <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-700">
                             <div className="flex items-center justify-between text-xs">
-                              <span className="flex items-center gap-1 text-slate-500 font-medium">
-                                <CheckSquare className="w-3 h-3 text-slate-400" />
+                              <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400 font-medium">
+                                <CheckSquare className="w-3 h-3 text-slate-400 dark:text-slate-400" />
                                 <span>Subtarefas</span>
-                                <span className="font-bold text-slate-700">
+                                <span className="font-bold text-slate-700 dark:text-slate-300">
                                   {totalSub > 0 && `(${doneSub}/${totalSub})`}
                                 </span>
                               </span>
@@ -477,14 +547,14 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
                                     activeSubtaskFormId === task.id ? null : task.id
                                   )
                                 }
-                                className="text-amber-600 hover:text-amber-700 font-semibold text-[11px]"
+                                className="text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-semibold text-[11px]"
                               >
                                 + Adicionar
                               </button>
                             </div>
 
                             {totalSub > 0 && (
-                              <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                              <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
                                 <div
                                   className={`h-full rounded-full transition-all duration-300 ${
                                     subPercent === 100 ? 'bg-emerald-500' : 'bg-amber-500'
@@ -518,7 +588,7 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
                                   placeholder="Nova subtarefa..."
                                   autoFocus
                                   onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
+                                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
                                       e.preventDefault();
                                       handleAddSubtask(task.id);
                                     }
@@ -531,7 +601,7 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
                                       setSubtaskTitle('');
                                     }
                                   }}
-                                  className="flex-1 bg-slate-50 border border-slate-200 focus:bg-white focus:border-amber-500 rounded-lg px-2.5 py-1 text-xs text-slate-800 placeholder-slate-400 focus:outline-none"
+                                  className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 focus:border-amber-500 rounded-lg px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-400 focus:outline-none"
                                 />
                                 <button
                                   type="button"
@@ -547,7 +617,7 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
                                     setActiveSubtaskFormId(null);
                                     setSubtaskTitle('');
                                   }}
-                                  className="p-1 text-slate-400 hover:text-slate-600 text-xs"
+                                  className="p-1 text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xs"
                                 >
                                   ✕
                                 </button>
@@ -556,13 +626,13 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
                           </div>
 
                           {/* Status Transition Action Buttons */}
-                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5">
+                          <div className="pt-2 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between gap-1.5">
                             {task.status === 'TODO' && (
                               <button
                                 type="button"
                                 onClick={() => handleMoveTask(task, 'IN_PROGRESS')}
                                 disabled={isMoving}
-                                className="w-full flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 transition-all"
+                                className="w-full flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl text-xs font-semibold bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/70 transition-all"
                               >
                                 {isMoving ? (
                                   <Loader2 className="w-3 h-3 animate-spin" />
@@ -581,7 +651,7 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
                                   type="button"
                                   onClick={() => handleMoveTask(task, 'TODO')}
                                   disabled={isMoving}
-                                  className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-all"
+                                  className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-all"
                                 >
                                   <ArrowLeft className="w-3 h-3" />
                                   <span>Voltar</span>
@@ -590,7 +660,7 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
                                   type="button"
                                   onClick={() => handleMoveTask(task, 'DONE')}
                                   disabled={isMoving}
-                                  className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-all"
+                                  className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/70 transition-all"
                                 >
                                   <span>Concluir</span>
                                   <CheckCircle2 className="w-3 h-3" />
@@ -603,7 +673,7 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({ onOpenCreate
                                 type="button"
                                 onClick={() => handleMoveTask(task, 'IN_PROGRESS')}
                                 disabled={isMoving}
-                                className="w-full flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-all"
+                                className="w-full flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-all"
                               >
                                 {isMoving ? (
                                   <Loader2 className="w-3 h-3 animate-spin" />

@@ -1,136 +1,141 @@
 import React from 'react';
-import { Layers, PlayCircle, CheckCircle2, ArrowUpRight } from 'lucide-react';
+import { CheckCircle2, CircleDot, ListTodo, TrendingUp } from 'lucide-react';
 import type { Task } from '../types';
 
 interface DashboardOverviewProps {
   tasks: Task[];
+  compactMobile?: boolean;
 }
 
-export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ tasks }) => {
-  const totalTasks = tasks.length;
-  const todoTasks = tasks.filter((t) => t.status === 'TODO').length;
-  const inProgressTasks = tasks.filter((t) => t.status === 'IN_PROGRESS').length;
-  const doneTasks = tasks.filter((t) => t.status === 'DONE').length;
+export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ tasks, compactMobile = false }) => {
+  const total = tasks.length;
+  const todo = tasks.filter((task) => task.status === 'TODO').length;
+  const inProgress = tasks.filter((task) => task.status === 'IN_PROGRESS').length;
+  const done = tasks.filter((task) => task.status === 'DONE').length;
+  const progress = total ? Math.round((done / total) * 100) : 0;
 
-  const completionRate = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+  const radialRadius = 22;
+  const radialCircumference = 2 * Math.PI * radialRadius;
+  const radialDashOffset = radialCircumference - (progress / 100) * radialCircumference;
+
+  const metrics = [
+    {
+      label: 'Total de tarefas',
+      value: total,
+      detail: `${todo} pendentes`,
+      icon: ListTodo,
+      tone: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300',
+    },
+    {
+      label: 'Em andamento',
+      value: inProgress,
+      detail: 'Tarefas em execução',
+      icon: CircleDot,
+      tone: 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400',
+    },
+    {
+      label: 'Concluídas',
+      value: done,
+      detail: 'Tarefas finalizadas',
+      icon: CheckCircle2,
+      tone: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400',
+    },
+  ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {/* Card 1: Total de Tarefas */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card hover:shadow-card-hover transition-all flex flex-col justify-between group">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-500 tracking-wide uppercase">
-            Total de Tarefas
-          </span>
-          <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100/80 text-amber-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-            <Layers className="w-5 h-5" />
-          </div>
-        </div>
-        <div className="mt-3">
-          <div className="text-3xl font-extrabold text-slate-900 tracking-tight">
-            {totalTasks}
-          </div>
-          <p className="text-xs text-slate-500 mt-1 flex items-center gap-1 font-medium">
-            <span className="text-amber-600 font-semibold">{todoTasks}</span> pendentes no quadro
-          </p>
-        </div>
-      </div>
-
-      {/* Card 2: Em Andamento */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card hover:shadow-card-hover transition-all flex flex-col justify-between group">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-500 tracking-wide uppercase">
-            Em Andamento
-          </span>
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100/80 text-indigo-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-            <PlayCircle className="w-5 h-5" />
-          </div>
-        </div>
-        <div className="mt-3">
-          <div className="text-3xl font-extrabold text-slate-900 tracking-tight">
-            {inProgressTasks}
-          </div>
-          <p className="text-xs text-slate-500 mt-1 flex items-center gap-1 font-medium">
-            <span className="text-indigo-600 font-semibold">{inProgressTasks}</span> ativas agora
-          </p>
-        </div>
-      </div>
-
-      {/* Card 3: Concluídas */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card hover:shadow-card-hover transition-all flex flex-col justify-between group">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-500 tracking-wide uppercase">
-            Concluídas
-          </span>
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100/80 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
-        </div>
-        <div className="mt-3">
-          <div className="text-3xl font-extrabold text-slate-900 tracking-tight">
-            {doneTasks}
-          </div>
-          <p className="text-xs text-slate-500 mt-1 flex items-center gap-1 font-medium">
-            <span className="text-emerald-600 font-semibold">{completionRate}%</span> taxa de sucesso
-          </p>
-        </div>
-      </div>
-
-      {/* Card 4: Progresso Geral (Donut Ring Chart) */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card hover:shadow-card-hover transition-all flex items-center justify-between">
-        <div className="flex flex-col justify-between h-full pr-2">
-          <div className="flex items-center gap-1 text-xs font-semibold text-slate-500 tracking-wide uppercase">
-            <span>Progresso Geral</span>
-            <ArrowUpRight className="w-3.5 h-3.5 text-indigo-500" />
-          </div>
-          <div className="space-y-1.5 mt-2">
-            <div className="flex items-center gap-2 text-[11px] text-slate-600">
-              <span className="w-2 h-2 rounded-full bg-amber-400" />
-              <span>{todoTasks} A Fazer</span>
-            </div>
-            <div className="flex items-center gap-2 text-[11px] text-slate-600">
-              <span className="w-2 h-2 rounded-full bg-indigo-500" />
-              <span>{inProgressTasks} Em Andamento</span>
-            </div>
-            <div className="flex items-center gap-2 text-[11px] text-slate-600">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span>{doneTasks} Concluído</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Pure SVG Circular Donut Chart (zero dependencies) */}
-        <div className="relative w-20 h-20 shrink-0 flex items-center justify-center">
-          <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-            {/* Background Track */}
-            <path
-              className="text-slate-100"
-              strokeWidth="3.6"
-              stroke="currentColor"
-              fill="none"
-              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-            />
-            {/* Completion Progress Stroke */}
-            <path
-              className="text-indigo-600 transition-all duration-700 ease-out"
-              strokeDasharray={`${completionRate}, 100`}
-              strokeWidth="3.6"
-              strokeLinecap="round"
-              stroke="currentColor"
-              fill="none"
-              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-            />
-          </svg>
-          <div className="absolute flex flex-col items-center justify-center text-center pointer-events-none">
-            <span className="text-sm font-extrabold text-slate-900 leading-none">
-              {completionRate}%
-            </span>
-            <span className="text-[8px] font-semibold text-slate-400 uppercase tracking-tight mt-0.5">
-              Taxa
+    <section
+      aria-label="Resumo do projeto"
+      className={`grid ${compactMobile ? 'grid-cols-2 gap-2 sm:gap-4' : 'grid-cols-1 gap-4'} sm:grid-cols-2 2xl:grid-cols-4`}
+    >
+      {metrics.map(({ label, value, detail, icon: Icon, tone }) => (
+        <div
+          key={label}
+          className={`bb-panel flex ${compactMobile ? 'min-h-28 p-3 sm:min-h-36 sm:p-5' : 'min-h-36 p-5'} flex-col justify-between`}
+        >
+          <div className="flex items-start justify-between gap-2 sm:gap-3">
+            <p className={`${compactMobile ? 'text-xs sm:text-sm' : 'text-sm'} font-medium text-slate-500 dark:text-slate-400`}>
+              {label}
+            </p>
+            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl sm:h-9 sm:w-9 ${tone}`}>
+              <Icon className="h-[18px] w-[18px]" />
             </span>
           </div>
+          <div>
+            <p className={`bb-tabular font-mono ${compactMobile ? 'text-2xl sm:text-[30px]' : 'text-[30px]'} font-bold leading-none tracking-tight text-slate-950 dark:text-slate-100`}>
+              {value}
+            </p>
+            <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400 sm:mt-2 sm:text-xs">
+              {detail}
+            </p>
+          </div>
+        </div>
+      ))}
+
+      <div
+        className={`bb-panel flex ${compactMobile ? 'min-h-28 p-3 sm:min-h-36 sm:p-5' : 'min-h-36 p-5'} flex-col justify-between`}
+      >
+        <div className="flex items-start justify-between gap-2 sm:gap-3">
+          <p className={`${compactMobile ? 'text-xs sm:text-sm' : 'text-sm'} font-medium text-slate-500 dark:text-slate-400`}>
+            Progresso geral
+          </p>
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 sm:h-9 sm:w-9">
+            <TrendingUp className="h-[18px] w-[18px]" />
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className={`bb-tabular font-mono ${compactMobile ? 'text-2xl sm:text-[30px]' : 'text-[30px]'} font-bold leading-none tracking-tight text-slate-950 dark:text-slate-100`}>
+              {progress}%
+            </p>
+            <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400 sm:mt-2 sm:text-xs">
+              <span className="bb-tabular font-mono">{done}</span> de <span className="bb-tabular font-mono">{total}</span>
+            </p>
+          </div>
+
+          <div
+            className="relative flex h-14 w-14 shrink-0 items-center justify-center sm:h-16 sm:w-16"
+            role="progressbar"
+            aria-label="Progresso geral"
+            aria-valuenow={progress}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <svg
+              className="h-14 w-14 -rotate-90 transform sm:h-16 sm:w-16"
+              viewBox="0 0 56 56"
+              aria-hidden="true"
+            >
+              <circle
+                cx="28"
+                cy="28"
+                r={radialRadius}
+                fill="transparent"
+                stroke="currentColor"
+                strokeWidth="5"
+                className="text-slate-200 dark:text-slate-800"
+              />
+              <circle
+                cx="28"
+                cy="28"
+                r={radialRadius}
+                fill="transparent"
+                stroke="currentColor"
+                strokeWidth="5"
+                strokeDasharray={radialCircumference}
+                strokeDashoffset={radialDashOffset}
+                strokeLinecap="round"
+                className="text-indigo-600 transition-all duration-500 dark:text-indigo-400 motion-reduce:transition-none"
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="bb-tabular font-mono text-[10px] font-bold text-slate-600 dark:text-slate-300 sm:text-xs">
+                {progress}%
+              </span>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 };

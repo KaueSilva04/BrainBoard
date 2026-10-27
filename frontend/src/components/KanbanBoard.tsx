@@ -1,14 +1,18 @@
-import React, { useState } from 'react';
-import { Plus, Milestone, Layers } from 'lucide-react';
-import type { Project, Stage, Task, TaskStatus } from '../types';
+import React, { useEffect, useState } from 'react';
+import { Plus, Milestone, Users } from 'lucide-react';
+import type { Project, Stage, Task, TaskStatus, ProjectCollaborator } from '../types';
 import { KanbanColumn } from './KanbanColumn';
 import { StageColumn } from './StageColumn';
 import { DashboardOverview } from './DashboardOverview';
+import { AvatarStack } from './collaborators/AvatarStack';
 
 export interface KanbanBoardProps {
   project?: Project | null;
   stages: Stage[];
   tasks: Task[];
+  summaryTasks?: Task[];
+  collaborators?: ProjectCollaborator[];
+  onOpenCollaboratorsModal?: () => void;
   onMoveTask: (id: string, status: TaskStatus) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
   onAddSubtask: (taskId: string, title: string) => Promise<void>;
@@ -18,12 +22,15 @@ export interface KanbanBoardProps {
   onOpenCreateStage?: () => void;
   onOpenCreateModal?: () => void;
   selectedCategory?: string;
+  searchQuery?: string;
 }
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
-  project,
   stages,
   tasks,
+  summaryTasks = tasks,
+  collaborators = [],
+  onOpenCollaboratorsModal,
   onMoveTask,
   onDeleteTask,
   onAddSubtask,
@@ -32,8 +39,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onOpenCreateTask,
   onOpenCreateStage,
   onOpenCreateModal,
+  searchQuery = '',
 }) => {
-  const [boardView, setBoardView] = useState<'STAGES' | 'STATUS'>('STATUS');
+  const [boardView, setBoardView] = useState<'STAGES' | 'STATUS'>(stages.length === 0 ? 'STAGES' : 'STATUS');
+  useEffect(() => {
+    if (stages.length === 0) setBoardView('STAGES');
+  }, [stages.length]);
   const todoTasks = tasks.filter((t) => t.status === 'TODO');
   const inProgressTasks = tasks.filter((t) => t.status === 'IN_PROGRESS');
   const doneTasks = tasks.filter((t) => t.status === 'DONE');
@@ -47,70 +58,79 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   };
 
   return (
-    <div className="space-y-6 flex flex-col h-full">
+    <div className="flex flex-col gap-8 bb-page-enter motion-reduce:animate-none">
       {/* Dashboard Overview Metrics Section */}
-      <DashboardOverview tasks={tasks} />
+      {searchQuery.trim() && <p className="-mb-6 break-words text-sm text-slate-600 dark:text-slate-300 [overflow-wrap:anywhere]">A busca filtra somente os cartões do quadro; os indicadores abaixo consideram todas as tarefas do projeto.</p>}
+      <DashboardOverview tasks={summaryTasks} compactMobile />
 
-      {/* Modern Professional Board Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
-        <div className="flex items-center gap-4 flex-wrap">
-          
-
-
-          {/* Grouping Toggle */}
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-            <span className="hidden sm:inline">Agrupar por:</span>
-            <select
-              value={boardView}
-              onChange={(e) => setBoardView(e.target.value as 'STAGES' | 'STATUS')}
-              className="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer shadow-sm"
-            >
-              <option value="STATUS">Status (Kanban)</option>
-              <option value="STAGES">Etapas ({stages.length})</option>
-            </select>
-          </div>
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
+        <div>
+          <h2 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">Quadro de tarefas</h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Visualize o fluxo por status ou por etapa.</p>
         </div>
-
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-3">
+          <div aria-label="Agrupar tarefas" className="inline-flex rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-0.5">
+            <button type="button" onClick={() => setBoardView('STATUS')} disabled={stages.length === 0} aria-pressed={boardView === 'STATUS'} className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${boardView === 'STATUS' ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'}`}>Por status</button>
+            <button type="button" onClick={() => setBoardView('STAGES')} aria-pressed={boardView === 'STAGES'} className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${boardView === 'STAGES' ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'}`}>Por etapa</button>
+          </div>
+          {onOpenCollaboratorsModal && (
+            <button
+              type="button"
+              onClick={onOpenCollaboratorsModal}
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-sm font-medium text-slate-700 dark:text-slate-300 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              {collaborators && collaborators.length > 0 ? (
+                <AvatarStack collaborators={collaborators} max={3} size="sm" />
+              ) : (
+                <Users className="h-4 w-4 text-slate-500" />
+              )}
+              <span className="hidden sm:inline">Equipe</span>
+            </button>
+          )}
           {onOpenCreateStage && (
             <button
               type="button"
               onClick={onOpenCreateStage}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-sm transition-colors"
+              className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-sm font-medium text-slate-700 dark:text-slate-300 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Etapa</span>
+              <Plus className="h-4 w-4" />
+              <span>Nova etapa</span>
             </button>
           )}
           <button
             type="button"
             onClick={() => handleCreateTaskTrigger()}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-sm shadow-indigo-500/20 transition-all"
+            className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-slate-900 px-4 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
           >
-            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>Nova Tarefa</span>
+            <Plus className="h-4 w-4" />
+            <span>Nova tarefa</span>
           </button>
         </div>
       </div>
 
       {/* Board Columns View */}
-      {boardView === 'STAGES' ? (
+      {tasks.length === 0 && searchQuery.trim() ? (
+        <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-6 py-16 text-center">
+          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Nenhuma tarefa encontrada</h3>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Tente outro termo na busca.</p>
+        </div>
+      ) : boardView === 'STAGES' ? (
         stages.length === 0 ? (
-          <div className="text-center py-16 px-4 bg-white rounded-3xl border border-slate-200/80 shadow-card">
-            <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center mx-auto mb-3.5">
-              <Milestone className="w-7 h-7" />
+          <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-6 py-16 text-center">
+            <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center mx-auto mb-3.5">
+              <Milestone className="w-6 h-6" />
             </div>
-            <h3 className="text-base font-bold text-slate-800">
+            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
               Nenhuma etapa cadastrada neste projeto
             </h3>
-            <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-              Crie etapas (milestones) para organizar o fluxo de trabalho e atribuir tarefas a cada fase.
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+              Crie uma etapa para começar a organizar as tarefas deste projeto.
             </p>
             {onOpenCreateStage && (
               <button
                 type="button"
                 onClick={onOpenCreateStage}
-                className="mt-5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-md shadow-indigo-500/20 transition-all inline-flex items-center gap-1.5"
+                className="mt-6 inline-flex h-10 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
               >
                 <Plus className="w-4 h-4 stroke-[2.5]" />
                 <span>Criar Primeira Etapa</span>
@@ -118,7 +138,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-2 2xl:grid-cols-3">
             {stages.map((stage) => {
               const stageTasks = tasks.filter((t) => t.stageId === stage.id);
               return (
@@ -126,6 +146,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   key={stage.id}
                   stage={stage}
                   tasks={stageTasks}
+                  collaborators={collaborators}
                   onMoveTask={onMoveTask}
                   onDeleteTask={onDeleteTask}
                   onAddSubtask={onAddSubtask}
@@ -138,29 +159,33 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
             {/* Quick Add Stage Column Card */}
             {onOpenCreateStage && (
-              <div
+              <button
+                type="button"
                 onClick={onOpenCreateStage}
-                className="flex flex-col items-center justify-center min-h-[300px] border-2 border-dashed border-slate-300 hover:border-indigo-400 rounded-2xl bg-slate-50/50 hover:bg-indigo-50/30 p-6 text-center cursor-pointer transition-all group"
+                className="group flex w-full self-start flex-row items-center justify-start gap-3 rounded-xl border border-dashed border-slate-300 bg-white/50 px-4 py-3 text-left transition-colors hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/50 dark:hover:border-slate-600 dark:hover:bg-slate-800/50 sm:flex-col sm:justify-center sm:gap-0 sm:p-6 sm:text-center"
               >
-                <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 group-hover:border-indigo-300 text-slate-400 group-hover:text-indigo-600 flex items-center justify-center transition-colors mb-2">
-                  <Plus className="w-5 h-5" />
+                <div className="mb-0 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors group-hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:group-hover:text-slate-100 sm:mb-2 sm:h-10 sm:w-10">
+                  <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
-                <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-700">
-                  Adicionar Nova Etapa
-                </p>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Clique para criar mais um marco no projeto
-                </p>
-              </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-slate-700 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-100">
+                    Adicionar Nova Etapa
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-400 sm:mt-1">
+                    Clique para criar mais um marco no projeto
+                  </p>
+                </div>
+              </button>
             )}
           </div>
         )
       ) : (
         /* 3-Column Traditional Status Grid (TODO, IN_PROGRESS, DONE) */
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
           <KanbanColumn
             status="TODO"
             tasks={todoTasks}
+            collaborators={collaborators}
             onMoveTask={onMoveTask}
             onDeleteTask={onDeleteTask}
             onAddSubtask={onAddSubtask}
@@ -171,6 +196,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           <KanbanColumn
             status="IN_PROGRESS"
             tasks={inProgressTasks}
+            collaborators={collaborators}
             onMoveTask={onMoveTask}
             onDeleteTask={onDeleteTask}
             onAddSubtask={onAddSubtask}
@@ -181,6 +207,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           <KanbanColumn
             status="DONE"
             tasks={doneTasks}
+            collaborators={collaborators}
             onMoveTask={onMoveTask}
             onDeleteTask={onDeleteTask}
             onAddSubtask={onAddSubtask}
@@ -190,29 +217,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         </div>
       )}
 
-      {/* When total tasks is 0 */}
-      {tasks.length === 0 && (
-        <div className="text-center py-12 px-4 bg-white rounded-3xl border border-slate-200/80 shadow-card mt-6">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center mx-auto mb-3">
-            <Layers className="w-6 h-6" />
-          </div>
-          <h3 className="text-sm font-bold text-slate-800">
-            Nenhuma tarefa cadastrada no momento
-          </h3>
-          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-            {project
-              ? `Adicione tarefas às etapas do projeto "${project.title}".`
-              : 'Comece organizando sua rotina criando sua primeira tarefa.'}
-          </p>
-          <button
-            onClick={() => handleCreateTaskTrigger()}
-            className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all inline-flex items-center gap-1.5"
-          >
-            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>Criar Primeira Tarefa</span>
-          </button>
-        </div>
-      )}
     </div>
   );
 };

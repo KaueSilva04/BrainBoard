@@ -1,12 +1,13 @@
 import React from 'react';
 import { Clock, PlayCircle, CheckCircle2, Layers } from 'lucide-react';
-import type { Task, TaskStatus } from '../types';
+import type { Task, TaskStatus, ProjectCollaborator } from '../types';
 import { TASK_STATUS_LABELS } from '../types';
 import { TaskCard } from './TaskCard';
 
 export interface KanbanColumnProps {
   status: TaskStatus;
   tasks: Task[];
+  collaborators?: ProjectCollaborator[];
   onMoveTask: (id: string, status: TaskStatus) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
   onAddSubtask: (taskId: string, title: string) => Promise<void>;
@@ -18,6 +19,7 @@ export interface KanbanColumnProps {
 export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   status,
   tasks,
+  collaborators,
   onMoveTask,
   onDeleteTask,
   onAddSubtask,
@@ -28,27 +30,23 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
     TaskStatus,
     {
       icon: React.ReactNode;
-      accentBorder: string;
       badgeStyle: string;
       emptyText: string;
     }
   > = {
     TODO: {
-      icon: <Clock className="w-4 h-4 text-amber-500" />,
-      accentBorder: 'border-t-4 border-t-amber-400',
-      badgeStyle: 'bg-amber-100/80 text-amber-800 border border-amber-200/60',
+      icon: <Clock className="w-4 h-4 text-amber-500 dark:text-amber-400" />,
+      badgeStyle: 'bg-amber-100/80 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/70',
       emptyText: 'Nenhuma tarefa pendente',
     },
     IN_PROGRESS: {
-      icon: <PlayCircle className="w-4 h-4 text-indigo-500" />,
-      accentBorder: 'border-t-4 border-t-indigo-500',
-      badgeStyle: 'bg-indigo-100/80 text-indigo-800 border border-indigo-200/60',
+      icon: <PlayCircle className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />,
+      badgeStyle: 'bg-indigo-100/80 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/70',
       emptyText: 'Nenhuma tarefa em andamento',
     },
     DONE: {
-      icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" />,
-      accentBorder: 'border-t-4 border-t-emerald-500',
-      badgeStyle: 'bg-emerald-100/80 text-emerald-800 border border-emerald-200/60',
+      icon: <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />,
+      badgeStyle: 'bg-emerald-100/80 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/70',
       emptyText: 'Nenhuma tarefa concluída',
     },
   };
@@ -57,35 +55,36 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
 
   return (
     <div
-      className={`flex flex-col bg-slate-100/75 rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden min-h-[550px] ${config.accentBorder}`}
+      className="bb-kanban-column flex min-h-[280px] min-w-0 flex-col"
     >
       {/* Column Header */}
-      <div className="px-4 py-3.5 bg-white/70 border-b border-slate-200/80 flex items-center justify-between backdrop-blur-xs">
+      <div className="bb-kanban-column-header flex items-center justify-between px-5 py-4">
         <div className="flex items-center gap-2">
           {config.icon}
-          <h3 className="text-xs font-extrabold text-slate-800 tracking-wider uppercase">
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
             {TASK_STATUS_LABELS[status]}
           </h3>
         </div>
         <span
-          className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${config.badgeStyle}`}
+          className={`bb-tabular font-mono px-2.5 py-0.5 rounded-full text-xs font-bold ${config.badgeStyle}`}
         >
           {tasks.length}
         </span>
       </div>
 
       {/* Cards List / Container */}
-      <div className="flex-1 p-3.5 space-y-3.5 overflow-y-auto">
+      <div className="flex-1 space-y-3 p-3 sm:p-4">
         {tasks.length === 0 ? (
-          <div className="h-44 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center text-slate-400 p-4 text-center">
-            <Layers className="w-7 h-7 mb-2 opacity-40 text-slate-400" />
-            <p className="text-xs font-medium text-slate-500">{config.emptyText}</p>
+          <div className="h-44 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl flex flex-col items-center justify-center text-slate-400 dark:text-slate-400 p-4 text-center">
+            <Layers className="w-7 h-7 mb-2 opacity-40 text-slate-400 dark:text-slate-400" />
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{config.emptyText}</p>
           </div>
         ) : (
           tasks.map((task) => (
             <TaskCard
               key={task.id}
               task={task}
+              collaborators={collaborators}
               onMoveTask={onMoveTask}
               onDeleteTask={onDeleteTask}
               onAddSubtask={onAddSubtask}

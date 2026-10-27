@@ -30,6 +30,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectProject }) =
   const [events, setEvents] = useState<CalendarEventProjection[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasLoadedEvents, setHasLoadedEvents] = useState(false);
 
   // Filter: ALL, APPOINTMENTS, ACADEMIC, TASKS
   const [eventTypeFilter, setEventTypeFilter] = useState<'ALL' | 'APPOINTMENTS' | 'ACADEMIC' | 'TASKS'>('ALL');
@@ -48,12 +49,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectProject }) =
   const loadEvents = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      if (!silent) setError(null);
       const data = await calendarApi.getEvents({ includeCompleted: true });
       setEvents(data);
+      setHasLoadedEvents(true);
+      setError(null);
     } catch (err: any) {
       console.error('Failed to load calendar events:', err);
-      if (!silent) setError('Não foi possível carregar os eventos do calendário.');
+      setError('Não foi possível carregar os eventos do calendário.');
     } finally {
       if (!silent) setLoading(false);
     }
@@ -146,7 +148,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectProject }) =
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
       if (eventTypeFilter === 'APPOINTMENTS' && e.sourceType !== 'APPOINTMENT') return false;
-      if (eventTypeFilter === 'ACADEMIC' && (e.sourceType !== 'TASK_DEADLINE' || e.projectType !== 'ACADEMIC')) return false;
+      if (eventTypeFilter === 'ACADEMIC' && e.sourceType !== 'ACADEMIC_ASSIGNMENT' && !(e.sourceType === 'TASK_DEADLINE' && e.projectType === 'ACADEMIC')) return false;
       if (eventTypeFilter === 'TASKS' && (e.sourceType !== 'TASK_DEADLINE' || e.projectType === 'ACADEMIC')) return false;
       return true;
     });
@@ -177,6 +179,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectProject }) =
   // Today key
   const now = new Date();
   const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const eventsUnverified = !hasLoadedEvents && (loading || Boolean(error));
+  const eventDetailsUnavailable = Boolean(error) || eventsUnverified;
 
   // Month grid cells
   const calendarCells = useMemo(() => {
@@ -225,19 +229,19 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectProject }) =
     const isApt = ev.sourceType === 'APPOINTMENT';
     const isAcad = ev.projectType === 'ACADEMIC';
 
-    let chipBg = 'bg-sky-50 text-sky-700 border-sky-200';
-    let icon = <FolderKanban className="w-2.5 h-2.5 shrink-0 text-sky-600" />;
+    let chipBg = 'bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800/70';
+    let icon = <FolderKanban className="w-2.5 h-2.5 shrink-0 text-sky-600 dark:text-sky-400" />;
 
     if (isApt) {
       chipBg = ev.isCompleted
-        ? 'bg-slate-100 text-slate-500 border-slate-200 line-through'
-        : 'bg-indigo-50 text-indigo-700 border-indigo-200';
-      icon = <Clock className="w-2.5 h-2.5 shrink-0 text-indigo-600" />;
+        ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 line-through'
+        : 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/70';
+      icon = <Clock className="w-2.5 h-2.5 shrink-0 text-indigo-600 dark:text-indigo-400" />;
     } else if (isAcad) {
       chipBg = ev.isCompleted
-        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-        : 'bg-pink-50 text-pink-700 border-pink-200';
-      icon = <GraduationCap className="w-2.5 h-2.5 shrink-0 text-pink-600" />;
+        ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/70'
+        : 'bg-pink-50 dark:bg-pink-950/50 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-800/70';
+      icon = <GraduationCap className="w-2.5 h-2.5 shrink-0 text-pink-600 dark:text-pink-400" />;
     }
 
     return (
@@ -253,137 +257,140 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectProject }) =
   };
 
   return (
-    <div className="space-y-6">
-      {/* Top Banner & Action Header */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-card">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/20">
-                <CalendarIcon className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                    Calendário & Compromissos
-                  </h2>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 uppercase">
-                    Agenda Unificada
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 font-medium">
-                  Visão mensal de compromissos agendados e prazos de entrega dos projetos
-                </p>
-              </div>
+    <div className="bb-page-stack bb-page-enter motion-reduce:animate-none">
+      {/* Calendar heading and controls */}
+      <section className="bb-panel p-4 sm:p-6" aria-labelledby="calendar-heading">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+              <CalendarIcon className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <h2 id="calendar-heading" className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">
+                Agenda mensal
+              </h2>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                Visão mensal de compromissos agendados e prazos de entrega dos projetos
+              </p>
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             <button
               onClick={() => loadEvents(false)}
               title="Atualizar eventos"
-              className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+              aria-label="Atualizar eventos"
+              className="rounded-xl border border-slate-200 p-2.5 text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin motion-reduce:animate-none' : ''}`} />
             </button>
 
             <button
+              type="button"
               onClick={() => setIsCreateModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-500/20 transition-all active:scale-98"
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
             >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
-              <span>+ Novo Compromisso</span>
+              <Plus className="h-4 w-4" />
+              <span>Novo compromisso</span>
             </button>
           </div>
         </div>
 
-        {/* Event Legend & Filters */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mt-6 pt-6 border-t border-slate-100">
-          {/* Category Filter Pills */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl border border-slate-200 text-xs font-semibold">
+        <div className="mt-5 flex flex-col gap-4 border-t border-slate-200 pt-4 dark:border-slate-700 lg:flex-row lg:items-end lg:justify-between">
+          {/* Event type filters */}
+          <div className="flex min-w-0 flex-col gap-2">
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Exibir</span>
+            <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 p-1 text-xs font-semibold dark:border-slate-700 dark:bg-slate-800/70">
             <button
+              type="button"
               onClick={() => setEventTypeFilter('ALL')}
+              aria-pressed={eventTypeFilter === 'ALL'}
               className={`px-3 py-1.5 rounded-xl transition-all ${
                 eventTypeFilter === 'ALL'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-slate-100'
+                  : 'text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700/70 dark:hover:text-white'
               }`}
             >
-              Todos ({events.length})
+              Todos ({loading ? '…' : error ? 'indisponível' : events.length})
             </button>
             <button
+              type="button"
               onClick={() => setEventTypeFilter('APPOINTMENTS')}
+              aria-pressed={eventTypeFilter === 'APPOINTMENTS'}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
                 eventTypeFilter === 'APPOINTMENTS'
-                  ? 'bg-white text-indigo-700 shadow-xs font-bold'
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'bg-white text-indigo-700 shadow-sm dark:bg-slate-700 dark:text-indigo-300 font-bold'
+                  : 'text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700/70 dark:hover:text-white'
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-indigo-500" />
               <span>Compromissos</span>
             </button>
             <button
+              type="button"
               onClick={() => setEventTypeFilter('ACADEMIC')}
+              aria-pressed={eventTypeFilter === 'ACADEMIC'}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
                 eventTypeFilter === 'ACADEMIC'
-                  ? 'bg-white text-pink-700 shadow-xs font-bold'
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'bg-white text-pink-700 shadow-sm dark:bg-slate-700 dark:text-pink-300 font-bold'
+                  : 'text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700/70 dark:hover:text-white'
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-pink-500" />
               <span>Entregas Acadêmicas</span>
             </button>
             <button
+              type="button"
               onClick={() => setEventTypeFilter('TASKS')}
+              aria-pressed={eventTypeFilter === 'TASKS'}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
                 eventTypeFilter === 'TASKS'
-                  ? 'bg-white text-sky-700 shadow-xs font-bold'
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'bg-white text-sky-700 shadow-sm dark:bg-slate-700 dark:text-sky-300 font-bold'
+                  : 'text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700/70 dark:hover:text-white'
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-sky-500" />
               <span>Prazos de Projetos</span>
             </button>
           </div>
+          </div>
 
-          {/* Month Navigator Controls */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
             <button
               onClick={handlePrevMonth}
               aria-label="Mês anterior"
-              className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+              className="rounded-xl border border-slate-200 p-2 text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
               onClick={handleToday}
-              className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+              className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
               Hoje
             </button>
             <button
               onClick={handleNextMonth}
               aria-label="Próximo mês"
-              className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+              className="rounded-xl border border-slate-200 p-2 text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
-            <span className="text-sm font-extrabold text-slate-900 capitalize pl-2">
+            <span className="min-w-[9rem] pl-1 text-base font-bold capitalize text-slate-900 dark:text-slate-100 sm:text-lg">
               {monthTitle}
             </span>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Error Banner */}
       {error && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center justify-between">
+        <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800/70 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
-          <button onClick={() => loadEvents(false)} className="font-bold underline hover:text-rose-800">
+          <button onClick={() => loadEvents(false)} className="font-bold underline hover:text-rose-800 dark:hover:text-rose-300">
             Tentar novamente
           </button>
         </div>
@@ -392,14 +399,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectProject }) =
       {/* Main Grid & Agenda Split View */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* Calendar Month Grid (Left 2 cols) */}
-        <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-slate-200/80 shadow-card space-y-4">
+        <div className="bb-panel space-y-4 p-3 sm:p-6 lg:col-span-2">
           {/* Weekday labels */}
-          <div className="grid grid-cols-7 gap-1 text-center pb-2 border-b border-slate-100">
+          <div className="grid grid-cols-7 gap-1 border-b border-slate-100 dark:border-slate-700 pb-2 text-center">
             {weekdays.map((day, idx) => (
               <span
                 key={day}
-                className={`text-xs font-bold uppercase tracking-wider ${
-                  idx === 0 || idx === 6 ? 'text-slate-400' : 'text-slate-600'
+                className={`text-xs font-semibold ${
+                  idx === 0 || idx === 6 ? 'text-slate-400 dark:text-slate-400' : 'text-slate-600 dark:text-slate-300'
                 }`}
               >
                 {day}
@@ -410,11 +417,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectProject }) =
           {/* Month Cells */}
           {loading ? (
             <div className="flex flex-col items-center justify-center py-36 space-y-3">
-              <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-              <p className="text-xs text-slate-500 font-medium">Carregando calendário...</p>
+                <Loader2 className="w-8 h-8 text-indigo-600 dark:text-indigo-400 animate-spin motion-reduce:animate-none" />
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Carregando calendário...</p>
             </div>
           ) : (
-            <div className="grid grid-cols-7 gap-1.5">
+            <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
               {calendarCells.map((cell) => {
                 const isToday = cell.dateKey === todayKey;
                 const isSelected = cell.dateKey === selectedDateKey;
@@ -423,15 +430,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectProject }) =
                 const extraCount = dayEvents.length - visibleEvents.length;
 
                 return (
-                  <div
+                  <button
                     key={cell.dateKey}
+                    type="button"
                     onClick={() => setSelectedDate(cell.dateObj)}
-                    className={`min-h-[96px] p-2 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+                    aria-pressed={isSelected}
+                        aria-label={`${cell.dateObj.toLocaleDateString('pt-BR', { dateStyle: 'full' })}${eventsUnverified ? (loading ? ', carregando eventos' : ', eventos indisponíveis') : dayEvents.length ? `, ${dayEvents.length} evento${dayEvents.length === 1 ? '' : 's'}` : ', sem eventos'}`}
+                    className={`min-h-12 sm:min-h-[96px] w-full p-1 sm:p-2 rounded-xl sm:rounded-2xl border transition-all cursor-pointer flex flex-col justify-between text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 motion-reduce:transition-none ${
                       isSelected
-                        ? 'border-indigo-600 ring-2 ring-indigo-500/20 bg-indigo-50/20 shadow-xs'
+                        ? 'border-indigo-600 ring-2 ring-indigo-500/20 bg-indigo-50/20 dark:bg-indigo-950/50 shadow-xs'
                         : cell.isCurrentMonth
-                        ? 'bg-white border-slate-200/70 hover:border-slate-300 hover:bg-slate-50/50'
-                        : 'bg-slate-50/50 border-slate-100 text-slate-300'
+                        ? 'bg-white dark:bg-slate-900 border-slate-200/70 dark:border-slate-700/70 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50/50 dark:hover:bg-slate-800/50'
+                        : 'bg-slate-50/50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-700 text-slate-300 dark:text-slate-500'
                     }`}
                   >
                     {/* Date Number Header */}
@@ -441,10 +451,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectProject }) =
                           isToday
                             ? 'bg-indigo-600 text-white shadow-xs'
                             : isSelected
-                            ? 'bg-indigo-100 text-indigo-700'
+                            ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300'
                             : cell.isCurrentMonth
-                            ? 'text-slate-700'
-                            : 'text-slate-400'
+                            ? 'text-slate-700 dark:text-slate-300'
+                            : 'text-slate-400 dark:text-slate-400'
                         }`}
                       >
                         {cell.dayNumber}
@@ -456,15 +466,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectProject }) =
                     </div>
 
                     {/* Event chips */}
-                    <div className="space-y-1 mt-1 flex-1 overflow-hidden">
+                    <div className="hidden space-y-1 mt-1 flex-1 overflow-hidden sm:block">
                       {visibleEvents.map(renderEventChip)}
                       {extraCount > 0 && (
-                        <div className="text-[9px] font-bold text-slate-500 pl-1">
+                        <div className="text-[9px] font-bold text-slate-500 dark:text-slate-400 pl-1">
                           +{extraCount} mais
                         </div>
                       )}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -472,13 +482,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectProject }) =
         </div>
 
         {/* Day Agenda Sidebar (Right 1 col) */}
-        <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-card space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div className="bb-panel space-y-4 p-5 sm:p-6">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Agenda do Dia
-              </p>
-              <h3 className="text-base font-black text-slate-900 capitalize mt-0.5">
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 capitalize">
                 {selectedDate.toLocaleDateString('pt-BR', {
                   weekday: 'long',
                   day: 'numeric',
@@ -489,7 +496,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectProject }) =
 
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:hover:bg-white dark:text-slate-950 text-xs font-semibold rounded-lg transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Novo</span>
@@ -499,18 +506,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectProject }) =
           {/* Events List for Selected Day */}
           {sortedSelectedDayEvents.length === 0 ? (
             <div className="text-center py-16 space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
                 <Clock className="w-6 h-6" />
               </div>
               <div className="space-y-1">
-                <h4 className="text-sm font-bold text-slate-700">Nenhum evento neste dia</h4>
-                <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                  Clique em "+ Novo" para adicionar um compromisso nesta data.
+                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">{eventDetailsUnavailable ? (loading && !hasLoadedEvents ? 'Carregando eventos…' : 'Agenda indisponível') : 'Nenhum evento neste dia'}</h4>
+                <p className="text-xs text-slate-400 dark:text-slate-400 max-w-xs mx-auto">
+                  {eventDetailsUnavailable ? (loading && !hasLoadedEvents ? 'Carregando eventos…' : 'Não é possível confirmar os eventos desta data.') : 'Clique em "+ Novo" para adicionar um compromisso nesta data.'}
                 </p>
               </div>
             </div>
           ) : (
-            <div className="space-y-3 max-h-[560px] overflow-y-auto pr-1">
+            <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-xl border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-slate-900 overflow-hidden max-h-[560px] overflow-y-auto">
               {sortedSelectedDayEvents.map((ev) => {
                 const isApt = ev.sourceType === 'APPOINTMENT';
                 const isToggling = togglingEventId === ev.id;
@@ -519,14 +526,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectProject }) =
                 return (
                   <div
                     key={ev.id}
-                    className={`p-4 rounded-2xl border transition-all space-y-2 ${
+                    className={`p-3.5 transition-colors space-y-2 ${
                       ev.isCompleted
-                        ? 'bg-slate-50 border-slate-200/70 opacity-75'
-                        : isApt
-                        ? 'bg-indigo-50/40 border-indigo-200/80 shadow-xs'
-                        : ev.projectType === 'ACADEMIC'
-                        ? 'bg-pink-50/40 border-pink-200/80 shadow-xs'
-                        : 'bg-sky-50/40 border-sky-200/80 shadow-xs'
+                        ? 'bg-slate-50/50 dark:bg-slate-800/40 opacity-75'
+                        : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/60'
                     }`}
                   >
                     {/* Header: Type Badge + Time + Checkbox */}
@@ -538,29 +541,29 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectProject }) =
                             onClick={() => handleToggleAppointment(ev)}
                             disabled={isToggling}
                             aria-label={ev.isCompleted ? 'Marcar como não concluído' : 'Marcar como concluído'}
-                            className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-colors ${
+                            className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
                               ev.isCompleted
                                 ? 'bg-emerald-500 border-emerald-500 text-white'
-                                : 'border-indigo-300 hover:border-indigo-600 bg-white'
+                                : 'border-indigo-300 dark:border-indigo-800/70 hover:border-indigo-600 bg-white dark:bg-slate-900'
                             }`}
                           >
                             {isToggling ? (
-                              <Loader2 className="w-3 h-3 animate-spin text-slate-400" />
+                              <Loader2 className="w-3 h-3 animate-spin text-slate-400 dark:text-slate-400" />
                             ) : ev.isCompleted ? (
                               <Check className="w-3 h-3 stroke-[3]" />
                             ) : null}
                           </button>
                         ) : (
-                          <div className="w-5 h-5 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500">
+                          <div className="w-5 h-5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400">
                             {ev.isCompleted ? (
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
                             ) : (
-                              <Clock className="w-3.5 h-3.5 text-slate-400" />
+                              <Clock className="w-3.5 h-3.5 text-slate-400 dark:text-slate-400" />
                             )}
                           </div>
                         )}
 
-                        <span className="text-xs font-bold text-slate-700">
+                        <span className="bb-tabular font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">
                           {formatTime(ev.start)}
                           {isApt && ` - ${formatTime(ev.end)}`}
                         </span>
@@ -569,12 +572,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectProject }) =
                       {/* Source tag & delete button */}
                       <div className="flex items-center gap-1.5">
                         <span
-                          className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full border ${
+                          className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${
                             isApt
-                              ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                              ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/70'
                               : ev.projectType === 'ACADEMIC'
-                              ? 'bg-pink-100 text-pink-700 border-pink-200'
-                              : 'bg-sky-100 text-sky-700 border-sky-200'
+                              ? 'bg-pink-50 dark:bg-pink-950/50 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-800/70'
+                              : 'bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800/70'
                           }`}
                         >
                           {isApt
@@ -590,7 +593,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectProject }) =
                             onClick={() => handleDeleteAppointment(ev)}
                             disabled={isDeleting}
                             aria-label="Excluir compromisso"
-                            className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1 rounded-lg transition-colors"
+                            className="text-slate-400 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 p-1 rounded-lg transition-colors"
                           >
                             {isDeleting ? (
                               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -605,39 +608,40 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectProject }) =
                     {/* Title */}
                     <div>
                       <h4
-                        className={`text-sm font-bold leading-tight ${
-                          ev.isCompleted ? 'text-slate-400 line-through' : 'text-slate-900'
+                        className={`text-sm font-semibold leading-tight ${
+                          ev.isCompleted ? 'text-slate-400 dark:text-slate-400 line-through' : 'text-slate-900 dark:text-slate-100'
                         }`}
                       >
                         {ev.title}
                       </h4>
                       {ev.description && (
-                        <p className="text-xs text-slate-500 mt-1 leading-relaxed line-clamp-2">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed line-clamp-2">
                           {ev.description}
                         </p>
                       )}
                     </div>
 
                     {/* Meta info: location or project/stage link */}
-                    <div className="flex items-center gap-2 pt-1 text-[11px] text-slate-500 flex-wrap">
+                    <div className="flex items-center gap-2 pt-0.5 text-[11px] text-slate-500 dark:text-slate-400 flex-wrap">
                       {ev.locationOrLink && (
                         <div className="flex items-center gap-1 font-medium">
-                          <MapPin className="w-3 h-3 text-slate-400" />
+                          <MapPin className="w-3 h-3 text-slate-400 dark:text-slate-400" />
                           <span className="truncate max-w-[200px]">{ev.locationOrLink}</span>
                         </div>
                       )}
 
                       {ev.projectTitle && (
                         <div className="flex items-center gap-1 font-medium">
-                          <FolderKanban className="w-3 h-3 text-slate-400" />
+                          <FolderKanban className="w-3 h-3 text-slate-400 dark:text-slate-400" />
                           <span>{ev.projectTitle}</span>
-                          {ev.stageTitle && <span className="text-slate-300">• {ev.stageTitle}</span>}
+                          {ev.stageTitle && <span className="text-slate-300 dark:text-slate-500">• {ev.stageTitle}</span>}
                           {onSelectProject && (
                             <button
                               type="button"
                               onClick={() => onSelectProject(ev.projectTitle || '')}
                               title="Ver projeto"
-                              className="ml-1 text-slate-400 hover:text-indigo-600 transition-colors"
+                              aria-label={`Ver projeto ${ev.projectTitle}`}
+                              className="ml-1 rounded p-0.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                             >
                               <ExternalLink className="w-3 h-3" />
                             </button>

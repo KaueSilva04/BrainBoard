@@ -18,12 +18,34 @@ import type {
   CreateAppointmentInput,
   UpdateAppointmentInput,
   CalendarEventProjection,
+  DashboardOverviewDto,
+  AuthUser,
+  AuthResponse,
+  LoginInput,
+  RegisterInput,
+  ProjectCollaborator,
+  ProjectMemberRole,
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
-if (import.meta.env.PROD && !import.meta.env.VITE_API_URL) {
-  console.warn('[api] VITE_API_URL não definida em produção. Usando URL relativa.');
+// ---- Token Storage -----------------------------------------
+let currentAuthToken: string | null =
+  typeof window !== 'undefined' ? localStorage.getItem('brainboard_token') : null;
+
+export function setAuthToken(token: string | null): void {
+  currentAuthToken = token;
+  if (typeof window !== 'undefined') {
+    if (token) {
+      localStorage.setItem('brainboard_token', token);
+    } else {
+      localStorage.removeItem('brainboard_token');
+    }
+  }
+}
+
+export function getAuthToken(): string | null {
+  return currentAuthToken;
 }
 
 // ---- Custom error class ------------------------------------
@@ -39,14 +61,28 @@ async function request<T>(path: string, options?: RequestInit, timeoutMs = 15_00
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json; charset=utf-8',
+    ...(options?.headers as Record<string, string> | undefined),
+  };
+
+  if (currentAuthToken) {
+    headers['Authorization'] = `Bearer ${currentAuthToken}`;
+  }
+
   try {
     const res = await fetch(`${BASE_URL}${path}`, {
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
-      signal: controller.signal,
       ...options,
+      headers,
+      signal: controller.signal,
     });
 
     if (!res.ok) {
+      if (res.status === 401 && !path.startsWith('/api/auth/login') && !path.startsWith('/api/auth/register')) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('brainboard:unauthorized'));
+        }
+      }
       const body = await res.text().catch(() => '');
       let message: string;
       try { message = JSON.parse(body)?.error ?? body; } catch { message = body || res.statusText; }
@@ -351,6 +387,13 @@ export const calendarApi = {
   },
 };
 
+export const dashboardApi = {
+  getOverview(from: string, to: string): Promise<DashboardOverviewDto> {
+    const params = new URLSearchParams({ from, to });
+    return request(`/api/dashboard/overview?${params.toString()}`);
+  },
+};
+
 // ============================================================
 // Academic API
 // ============================================================
@@ -381,3 +424,75 @@ export const academicApi = {
     return request(`/api/academic/assignments/${id}`, { method: 'DELETE' });
   },
 };
+
+// ============================================================
+// Auth API
+// ============================================================
+export const authApi = {
+  login(input: LoginInput): Promise<AuthResponse> {
+    return request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  register(input: RegisterInput): Promise<AuthResponse> {
+    return request('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  me(): Promise<{ user: AuthUser }> {
+    return request('/api/auth/me');
+  },
+
+  logout(): Promise<{ success: boolean; message: string }> {
+    return request('/api/auth/logout', {
+      method: 'POST',
+    });
+  },
+
+  mcpToken(): Promise<{ token: string; expiresIn: string; user: AuthUser }> {
+    return request('/api/auth/mcp-token', {
+      method: 'POST',
+    });
+  },
+};
+
+// ============================================================
+// Users API
+// ============================================================
+export const usersApi = {
+  search(query: string, limit = 10): Promise<AuthUser[]> {
+    const params = new URLSearchParams({ q: query, limit: String(limit) });
+    return request(`/api/users/search?${params.toString()}`);
+  },
+};
+
+// ============================================================
+// Project Collaborators API
+// ============================================================
+export const collaboratorsApi = {
+  list(projectId: string): Promise<ProjectCollaborator[]> {
+    return request(`/api/projects/${projectId}/collaborators`);
+  },
+
+  add(
+    projectId: string,
+    input: { userId?: string; email?: string; role?: ProjectMemberRole }
+  ): Promise<ProjectCollaborator> {
+    return request(`/api/projects/${projectId}/collaborators`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  remove(projectId: string, userId: string): Promise<{ success: boolean; message: string }> {
+    return request(`/api/projects/${projectId}/collaborators/${userId}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+export const projectCollaboratorsApi = collaboratorsApi;

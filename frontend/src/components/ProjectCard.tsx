@@ -1,114 +1,67 @@
 import React from 'react';
-import { Github, Users, Layers, BookOpen, Calendar, Trash2 } from 'lucide-react';
-import type { ProjectSummary, ProjectStatus } from '../types';
-import { PROJECT_STATUS_LABELS, PROJECT_STATUS_COLORS } from '../types';
+import { ArrowUpRight, CalendarDays, FolderKanban, Github, Layers3, Trash2, Users } from 'lucide-react';
+import type { ProjectSummary, ProjectStatus, ProjectCollaborator } from '../types';
+import { PROJECT_STATUS_LABELS } from '../types';
+import { getProjectCover } from '../utils/projectCover';
+import { AvatarStack } from './collaborators/AvatarStack';
 
 interface ProjectCardProps {
   project: ProjectSummary;
   onClick: (id: string) => void;
   onDelete?: (id: string, title: string) => void;
+  featured?: boolean;
 }
 
-const STATUS_DOT: Record<ProjectStatus, string> = {
-  PLANNING: 'bg-amber-400',
-  ACTIVE: 'bg-blue-500',
-  COMPLETED: 'bg-emerald-500',
+const statusStyles: Record<ProjectStatus, string> = {
+  PLANNING: 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 ring-amber-200 dark:ring-amber-800/70',
+  ACTIVE: 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 ring-indigo-200 dark:ring-indigo-800/70',
+  COMPLETED: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-800/70',
 };
 
-export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onDelete }) => {
-  const formattedDate = new Date(project.createdAt).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
+export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onDelete, featured = false }) => {
+  const createdAt = new Date(project.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+  const cover = getProjectCover(project.id);
+  const projectCollaborators: ProjectCollaborator[] = (project.collaborators || []).map((c) => ({
+    id: c.id,
+    userId: c.userId,
+    name: c.user?.name || 'Membro',
+    email: c.user?.email || '',
+    avatarColor: c.user?.avatarColor,
+    role: c.role,
+    isOwner: c.role === 'OWNER',
+  }));
 
-  return (
-    <div className="group relative w-full text-left bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all duration-200">
-      {/* Clickable Area */}
-      <button
-        type="button"
-        onClick={() => onClick(project.id)}
-        className="absolute inset-0 w-full h-full rounded-2xl z-0"
-        aria-label={`Abrir projeto ${project.title}`}
-      />
+  return <article className={`bb-panel bb-card-motion group flex min-h-[300px] flex-col overflow-hidden ${featured ? 'md:col-span-2' : ''}`}>
+    <button type="button" onClick={() => onClick(project.id)} aria-label={`Abrir projeto ${project.title}`} className={`relative flex flex-col justify-between overflow-hidden p-5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-400 sm:p-6 ${featured ? 'min-h-[178px] sm:min-h-[200px]' : 'min-h-[138px]'}`}>
+      <img src={cover} alt="" loading="lazy" decoding="async" className="bb-image-motion absolute inset-0 h-full w-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-950/70 via-indigo-950/35 to-cyan-900/45" />
+      <div className="relative flex w-full items-start justify-between gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-slate-950/35 text-white backdrop-blur"><FolderKanban className="h-5 w-5" /></div>
+        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusStyles[project.status]}`}>{PROJECT_STATUS_LABELS[project.status]}</span>
+      </div>
+      <h3 className="relative mt-5 line-clamp-2 text-lg font-bold leading-snug tracking-tight text-white">{project.title}</h3>
+    </button>
+    <button type="button" onClick={() => onClick(project.id)} aria-label={`Abrir quadro de ${project.title}`} className="flex-1 p-5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-400 sm:p-6"><p className="line-clamp-2 min-h-10 text-sm leading-relaxed text-slate-500 dark:text-slate-400">{project.description || 'Abra o projeto para organizar suas etapas e tarefas.'}</p>
+      <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400">Abrir quadro <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-1 motion-reduce:transform-none" /></span>
+    </button>
 
-      <div className="relative z-10">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="flex-1 min-w-0">
-            <h3 className="text-base font-semibold text-slate-800 truncate group-hover:text-indigo-700 transition-colors cursor-pointer" onClick={() => onClick(project.id)}>
-              {project.title}
-            </h3>
-            {project.description && (
-              <p className="mt-0.5 text-sm text-slate-400 line-clamp-2 leading-relaxed">
-                {project.description}
-              </p>
-            )}
-          </div>
-
-          {/* Actions & Status */}
-          <div className="flex flex-col items-end gap-2 shrink-0">
-            {onDelete && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(project.id, project.title);
-                }}
-                className="p-1.5 rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                aria-label="Excluir projeto"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            )}
-            <span
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${PROJECT_STATUS_COLORS[project.status]}`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[project.status]}`} />
-              {PROJECT_STATUS_LABELS[project.status]}
-            </span>
-          </div>
-        </div>
-
-        {/* Meta info */}
-        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 mt-4 pt-3 border-t border-slate-100">
-          {project._count && (
-            <>
-              <span className="flex items-center gap-1">
-                <Layers className="w-3.5 h-3.5" />
-                {project._count.stages} etapas
-              </span>
-              <span className="flex items-center gap-1">
-                <Users className="w-3.5 h-3.5" />
-                {project._count.members} membros
-              </span>
-              <span className="flex items-center gap-1">
-                <BookOpen className="w-3.5 h-3.5" />
-                {project._count.updateLogs} logs
-              </span>
-            </>
+    <div className="flex min-h-14 flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-100 dark:border-slate-700 px-5 py-3 text-xs text-slate-500 dark:text-slate-400 sm:px-6">
+      {project._count && <>
+        <span className="inline-flex items-center gap-1.5" title="Etapas"><Layers3 className="h-3.5 w-3.5" /><span className="bb-tabular font-mono">{project._count.stages}</span> etapas</span>
+        <span className="inline-flex items-center gap-1.5" title="Membros">
+          {projectCollaborators.length > 0 ? (
+            <AvatarStack collaborators={projectCollaborators} max={2} size="sm" />
+          ) : (
+            <Users className="h-3.5 w-3.5" />
           )}
-
-          <span className="flex items-center gap-1 ml-auto">
-            <Calendar className="w-3.5 h-3.5" />
-            {formattedDate}
-          </span>
-
-          {project.githubRepo && (
-            <a
-              href={project.githubRepo}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1 text-slate-400 hover:text-indigo-600 transition-colors relative z-20"
-              aria-label="Abrir repositório no GitHub"
-            >
-              <Github className="w-3.5 h-3.5" />
-              GitHub
-            </a>
-          )}
-        </div>
+          <span className="bb-tabular font-mono">{project._count.members || projectCollaborators.length}</span> membros
+        </span>
+      </>}
+      <span className="inline-flex items-center gap-1.5" title="Data de criação"><CalendarDays className="h-3.5 w-3.5" /><span className="bb-tabular font-mono">{createdAt}</span></span>
+      <div className="ml-auto flex items-center gap-1">
+        {project.githubRepo && <a href={project.githubRepo} target="_blank" rel="noopener noreferrer" aria-label={`Abrir GitHub de ${project.title}`} className="rounded-lg p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-indigo-700 dark:hover:text-indigo-300"><Github className="h-4 w-4" /></a>}
+        {onDelete && <button type="button" onClick={() => onDelete(project.id, project.title)} aria-label={`Excluir projeto ${project.title}`} className="rounded-lg p-2 text-slate-500 dark:text-slate-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 hover:text-rose-600 dark:hover:text-rose-400"><Trash2 className="h-4 w-4" /></button>}
       </div>
     </div>
-  );
+  </article>;
 };
