@@ -526,3 +526,216 @@ Expandir a suíte de testes em `tests/e2e_test_runner.ts` para cobrir:
 - [ ] Usuário consegue navegar fluidamente entre o quadro do projeto, a visão de sprint, a visão acadêmica e o calendário.
 - [ ] Tarefas podem ser adicionadas/removidas da sprint ativa na interface.
 - [ ] Compromissos podem ser cadastrados e visualizados no calendário com suas respectivas datas e horários.
+
+
+## 2026-10-26T14:20:00Z
+
+Reformulate the BrainBoard frontend interface (`frontend/`) into a high-craft productivity and academic studio inspired by the UI dashboard references on `https://br.pinterest.com/leandratognin/web-layout-de-sites-inspira%C3%A7%C3%B5es/` (Virtus, Timesheet UI, Veltrix, Settle Go, and Week Progress radial UI), adopting a hybrid visual direction (clean modular UI layout enriched with custom AI-generated editorial covers and empty-state/banner illustrations) and a committed left sidebar + 3-zone layout as the unified default experience on `/`.
+
+Working directory: C:\Users\Kaue\Desktop\BrainBoard
+Integrity mode: development
+
+Reference material:
+- `AGENTS.md`, `REDESIGN_BRIEF.md`, `REDESIGN_PLAN.md`, `DESIGN_GAP_REVIEW.md`, `IMPLEMENTATION_PLAN.md`
+- `.impeccable/surfaces/frontend-src-app-tsx.md` (active surface brief)
+- `C:\Users\Kaue\.gemini\antigravity-cli\brain\1b69d644-c2d5-497b-822b-26b1f41261cc\scratch\pin_1.jpg` .. `pin_10.jpg` (extracted reference pins from the Pinterest board)
+
+## Requirements
+
+### R1. Unified Shell, Navigation & 3-Zone Overview (`/`)
+Consolidate and verify the application shell (`frontend/src/App.tsx`, `frontend/src/components/Navbar.tsx`, `frontend/src/components/TopHeader.tsx`, `frontend/src/components/DashboardOverviewPage.tsx`) around a committed deep-indigo/slate left sidebar with project quick-switching and discreet `4:3` cover thumbnails (`getProjectCover`), a horizontal studio command header (`Ctrl+K` search with ABNT2 `AltGraph`/`isComposing` keyboard guard, theme toggle, sync, and context actions), and a 3-zone Overview page featuring radial focus telemetry, dated tabular task rows (`Timesheet` style), hybrid project cards, 7-day agenda, and honest `Em breve` module rows.
+
+### R2. Portfolio, Project Kanban & Focus Boards
+Reformulate the project portfolio (`frontend/src/components/ProjectList.tsx`, `frontend/src/components/ProjectCard.tsx`), project Kanban workspace (`frontend/src/components/DashboardOverview.tsx`, `frontend/src/components/KanbanBoard.tsx`, `frontend/src/components/KanbanColumn.tsx`, `frontend/src/components/StageColumn.tsx`, `frontend/src/components/TaskCard.tsx`), and global/project Focus view (`frontend/src/components/sprint/SprintKanbanView.tsx`) to use unified hairlined telemetry bars (including an SVG radial progress gauge in `DashboardOverview.tsx`), `12px–16px` panel radii (`.bb-panel`), single-border elevation without soft drop-shadow haze, tabular numeric alignment (`JetBrains Mono` / `.bb-tabular`), and zero uppercase eyebrow/kicker labels above headings.
+
+### R3. Calendar & Academic Views
+Reformulate `frontend/src/components/calendar/CalendarView.tsx` and `frontend/src/components/academic/AcademicView.tsx` to match the studio visual language, including dated tabular agenda rows in the calendar, removal of uppercase eyebrows/kickers above headings, and discreet illustrated cover thumbnails (`getProjectCover`) on academic subject cards and active subject headers, preserving all CRUD flows and real backend API contracts.
+
+### R4. Custom AI Visual Assets & Editorial Covers
+Generate cohesive, high-craft AI illustrations/covers (using the `image-generator` subagent or image generation tools) where they elevate the studio atmosphere — such as the Overview focus banner, Academic studio header, empty states, or project/subject cover set in `frontend/public/assets/` — harmonized with the deep-indigo, slate, emerald, and warm-amber palette. Embed AI provenance metadata on every generated raster asset using `.agents\skills\impeccable\scripts\impeccable.cmd embed-prompt --file <path> --prompt "<prompt>" --model "<model>"`.
+
+### R5. Repository, Accessibility & Data Honesty Constraints
+Preserve all existing local changes and follow `AGENTS.md`, `REDESIGN_BRIEF.md`, and `REDESIGN_PLAN.md`: never run `git push`, never open visible PowerShell/CMD windows, never invent fake metrics or unbacked controls (keep `Produtividade`, `Sequência`, and `Relógio` labeled `Em breve`), maintain full light/dark theme parity and `prefers-reduced-motion` support, update `DESIGN.md` with the finalized design system tokens, and never copy internal design-contract prose into source code comments.
+
+## Verification Resources
+
+- Frontend build & typecheck: `npm --prefix frontend run build`
+- Formatting & diff check: `git diff --check`
+- Impeccable mechanical & provenance checks:
+  - `.agents\skills\impeccable\scripts\impeccable.cmd detect --target frontend/src --json`
+  - `.agents\skills\impeccable\scripts\impeccable.cmd embed-prompt --scan frontend/public/assets`
+  - `.agents\skills\impeccable\scripts\impeccable.cmd surface-brief read frontend/src/App.tsx`
+- Live dev environment: Backend on `http://localhost:3000` (`/api/health`) and Vite dev server on `http://localhost:5173`
+
+## Acceptance Criteria
+
+### Build, Type Safety & Mechanical Craft
+- [ ] `npm --prefix frontend run build` succeeds with zero TypeScript or Vite bundling errors.
+- [ ] `git diff --check` returns zero formatting or whitespace issues.
+- [ ] `.agents\skills\impeccable\scripts\impeccable.cmd detect --target frontend/src --json` reports zero high-severity craft violations (no uppercase kickers/eyebrows above `h1`/`h2`/`h3`, no border + wide soft drop-shadow combinations on cards at rest, no copied design-contract phrases in source comments).
+- [ ] Any newly generated AI raster assets in `frontend/public/assets/` pass `.agents\skills\impeccable\scripts\impeccable.cmd embed-prompt --scan frontend/public/assets` with embedded provenance metadata.
+
+### Visual, Responsive & Functional Verification
+- [ ] All 6 primary surfaces (`Visão Geral`, `Projetos`, `Quadro Kanban do Projeto`, `Foco`, `Calendário`, `Acadêmico`) render without horizontal overflow, clipped text, or broken image links at desktop (`1440x900`) and mobile (`390x844`) viewports in both light and dark themes, with verification screenshots saved to `.impeccable/review/desktop.png` and `.impeccable/review/mobile.png`.
+- [ ] Every interactive flow (switching views from the committed sidebar, opening a project board, filtering with `Ctrl+K` without breaking ABNT2 `AltGr` input, toggling light/dark theme, viewing focus tasks, calendar events, and academic subjects) works against the live API without console or uncaught page errors.
+- [ ] Unimplemented modules (`Produtividade`, `Sequência`, `Relógio`) are displayed as honest `Em breve` items with zero fabricated metrics.
+- [ ] `DESIGN.md` is updated to document the finalized Onest + JetBrains Mono typography, Virtus/Timesheet hybrid palette, AI visual assets, and component patterns.
+
+
+## 2026-10-26T19:35:20Z
+
+Implement a full-stack User Authentication, Project Collaborators, and Task Assignment system in BrainBoard (`backend/` + `frontend/`), while executing a ruthless Impeccable **Distill & Polish (Anti-AI-Slop)** pass across the entire frontend to eliminate generic AI visual clichés, badge/pill clutter, default Tailwind indigo/blurple saturation, sci-fi background image bleed, and repetitive filler copy.
+
+Working directory: C:\Users\Kaue\Desktop\BrainBoard
+Integrity mode: development
+
+Reference material:
+- `.agents/skills/impeccable/SKILL.md`, `.agents/skills/impeccable/reference/craft-floor.md`, `.agents/skills/impeccable/reference/distill.md`, `.agents/skills/impeccable/reference/polish.md`
+- `AGENTS.md`, `DESIGN.md`, `REDESIGN_PLAN.md`
+- `.impeccable/surfaces/frontend-src-app-tsx.md`
+- Current visual baseline to critique and de-slop: `.impeccable/review/desktop.png` and `.impeccable/review/mobile.png`
+
+## Requirements
+
+### R1. User Accounts, Authentication & Safe Data Backfill
+Add persistent `User` accounts (`id`, `name`, `email`, password hash, avatar/initials color, timestamps) and authentication endpoints (register, login, logout, current session user, and user lookup/search for collaboration). Safely preserve and backfill existing projects and workspace records in the database to a default/seeded user account (or claim on first registration) so zero local data is lost or orphaned.
+
+### R2. Project Ownership, Collaborators & Scoped Visibility
+Associate every project with an owner (`User`) and allow adding/removing other registered `User` accounts as project collaborators (`OWNER`, `COLLABORATOR`). Enforce access control across project, stage, task, dashboard overview, and calendar endpoints so each authenticated user only sees and accesses projects where they are either the owner or an added collaborator.
+
+### R3. Task Assignment to Project Collaborators
+Allow tasks within a project to be assigned (or unassigned/reassigned) to any valid member of that project (the project owner or any added collaborator) during task creation and task editing/board interaction. Expose assignee details (`id`, `name`, `email`) in task API responses and display the assignee initials/name cleanly on task rows and Kanban cards.
+
+### R4. Impeccable Anti-AI-Slop Distill & Polish Across All Surfaces
+Apply `.agents/skills/impeccable/reference/craft-floor.md`, `distill.md`, and `polish.md` to eliminate every "AI slop" tell visible in `.impeccable/review/desktop.png` and `.impeccable/review/mobile.png`:
+1. **Kill Generic Tailwind Indigo/Blurple (`#6366f1`) Saturation**: Replace default `indigo-500`/`indigo-600` primary fills and badges with a refined architectural studio palette (e.g., high-contrast ink/graphite `#141824` / `#f8fafc` primary actions or deep cobalt/vermilion/emerald functional accents with restrained neutral surfaces). Primary CTAs must look like crisp software controls (`h-9` / `h-10`, `rounded-lg`), never bloated pill buttons.
+2. **Eliminate Badge, Pill & Icon-Box Soup**:
+   - Remove redundant inline pills next to page titles (e.g., delete `[Painel principal]` next to `Visão geral` and delete `[⚡ Prioridade em foco]` under the focus title).
+   - Remove decorative icons next to section headings (`CalendarIcon`, `Sparkles`, `Zap`, etc.). Let typography and weight establish hierarchy.
+   - In `Tarefas em Foco` (`DashboardOverviewPage.tsx`), remove the repetitive `[✓ Foco]` square icon box repeated on every undated row; use a clean tabular index (`01`, `02`...) or status dot + concise project/stage metadata, and show a date badge only when a real `dueDate` exists.
+   - Distill `Recursos em Avaliação (Em breve)` from a bulky 3-row icon-box card with verbose AI descriptions into a compact, single-block muted footer strip (`Em breve: Produtividade · Sequência · Relógio de foco`).
+3. **Remove Sci-Fi/Fantasy Wallpaper Bleed Behind Text**:
+   - Remove the full-bleed sci-fi mountain/planet image (`/assets/overview-hero.jpg`) from behind the typography in `DashboardOverviewPage.tsx` and `ProjectList.tsx`. Keep text surfaces 100% clean, architectural, and high-contrast. Use discreet, editorial abstract/geometric thumbnails (`4:3` or compact header strips) only where they belong (sidebar thumbnails and project/academic cards).
+4. **Fix Fake/Static Data Visualizations & Verbose AI Copy**:
+   - In `Status dos Projetos`, replace the fake static `border-8` ring with a true proportional multi-segment SVG ring or a crisp hairlined horizontal/tabular breakdown that accurately reflects `active`, `planning`, and `completed` ratios.
+   - Cut verbose, robotic helper copy in half across headers, empty states, and banners (no sentences explaining how to click a button right above the button).
+
+### R5. Studio UI for Auth, Collaborators & Task Assignees
+Build the new authentication and collaboration flows using the distilled, anti-slop studio language:
+- **Auth screen**: Crisp, minimal login and registration view (`14px` `.bb-panel`, high-contrast inputs, zero marketing fluff or AI clichés).
+- **Shell identity**: Compact user profile indicator (avatar initials + name/email) and logout button in the committed left sidebar (`Navbar.tsx`).
+- **Project Collaborators UI**: Compact avatar stack on project headers/cards and a clean Collaborators modal/popover (`KanbanBoard.tsx` / `TopHeader.tsx`) to invite registered users by email/name, view roles (`Owner` / `Colaborador`), and remove collaborators.
+- **Task Assignee UI**: Collaborator selector in `CreateTaskModal.tsx` and quick assignee switcher/badge on `TaskCard.tsx` and `SprintKanbanView.tsx`.
+
+### R6. Repository & Operational Constraints
+Follow `AGENTS.md`: never run `git push`, never open visible PowerShell/CMD windows, keep total subagents within the repository ceiling, preserve existing features and data, and update `DESIGN.md` to reflect the distilled anti-slop token system.
+
+## Verification Resources
+
+- Database & Backend build/validation:
+  - `npx --prefix backend prisma validate`
+  - `npm --prefix backend run build` (or `npx --prefix backend tsc --noEmit`)
+- Frontend build & typecheck:
+  - `npm --prefix frontend run build`
+- Formatting & diff check:
+  - `git diff --check`
+- Impeccable mechanical craft detector:
+  - `.agents\skills\impeccable\scripts\impeccable.cmd detect --target frontend/src --json`
+- Live environment:
+  - Backend API on `http://localhost:3000` (`/api/health`) and Frontend dev server on `http://localhost:5173`
+
+## Acceptance Criteria
+
+### Backend, Database & Multi-User Isolation
+- [ ] Prisma schema validates and migrates/pushes cleanly without data loss; both `backend` and `frontend` compile with zero TypeScript errors.
+- [ ] Programmatic API verification confirms end-to-end multi-user behavior:
+  1. Registering User A and User B succeeds and returns valid auth sessions/tokens.
+  2. A project created by User A is visible to User A in `GET /api/projects` and `GET /api/dashboard/overview`, and is **not** visible to User B before collaboration.
+  3. User A adding User B as a collaborator on the project makes the project immediately visible and accessible to User B in `GET /api/projects` and `GET /api/projects/:id`.
+  4. Assigning a project task to User B persists `assigneeId` and returns User B's user summary in task payloads.
+  5. Removing User B from the project revokes User B's access to the project and clears or safely handles their task assignment.
+
+### Impeccable Anti-AI-Slop & Visual Verification
+- [ ] `.agents\skills\impeccable\scripts\impeccable.cmd detect --target frontend/src --json` returns `[]` (zero craft violations).
+- [ ] Source inspection confirms zero default `indigo-500`/`indigo-600` button/badge saturation, zero sci-fi hero wallpaper behind text in `DashboardOverviewPage.tsx` and `ProjectList.tsx`, zero repetitive `[✓ Foco]` icon boxes on undated focus rows, and a compact distilled `Em breve` indicator.
+- [ ] Live browser verification at desktop (`1440x900`) and mobile (`390x844`) viewports in both light and dark themes confirms that Auth, Overview, Projects, Kanban Board (with Collaborators modal & Task Assignee), Focus, Calendar, and Academic views render with zero horizontal overflow and zero console errors, with fresh screenshots saved to `.impeccable/review/desktop.png` and `.impeccable/review/mobile.png`.
+
+
+## 2026-10-27T13:10:08Z
+
+Implement a full-stack User Authentication, Project Collaborators, and Task Assignment system in BrainBoard (`backend/` + `frontend/`), while executing a ruthless Impeccable **Distill & Polish (Anti-AI-Slop)** pass across the entire frontend to eliminate generic AI visual clichés, badge/pill clutter, default Tailwind indigo/blurple saturation, sci-fi background image bleed, and repetitive filler copy.
+
+Working directory: C:\Users\Kaue\Desktop\BrainBoard
+Integrity mode: development
+
+Reference material:
+- `C:\Users\Kaue\.gemini\skills\impeccable\SKILL.md`, `C:\Users\Kaue\.gemini\skills\impeccable\reference\craft-floor.md`, `C:\Users\Kaue\.gemini\skills\impeccable\reference\distill.md`, `C:\Users\Kaue\.gemini\skills\impeccable\reference\polish.md`
+- `AGENTS.md`, `DESIGN.md`, `REDESIGN_PLAN.md`
+- `.impeccable/surfaces/frontend-src-app-tsx.md`
+- Current visual baseline to critique and de-slop: `.impeccable/review/desktop.png` and `.impeccable/review/mobile.png`
+
+## Requirements
+
+### R1. User Accounts, Authentication & Safe Data Backfill
+Add persistent `User` accounts (`id`, `name`, `email`, password hash, avatar/initials color, timestamps) and authentication endpoints (register, login, logout, current session user, and user lookup/search for collaboration). Safely preserve and backfill existing projects and workspace records in the database to a default/seeded user account (`admin@brainboard.local`) so zero local data is lost or orphaned.
+
+### R2. Project Ownership, Collaborators & Scoped Visibility
+Associate every project with an owner (`User`) and allow adding/removing other registered `User` accounts as project collaborators (`OWNER`, `COLLABORATOR`). Enforce access control across project, stage, task, dashboard overview, and calendar endpoints so each authenticated user only sees and accesses projects where they are either the owner or an added collaborator.
+
+### R3. Task Assignment to Project Collaborators
+Allow tasks within a project to be assigned (or unassigned/reassigned) to any valid member of that project (the project owner or any added collaborator) during task creation and task editing/board interaction. Expose assignee details (`id`, `name`, `email`, `avatarColor`) in task API responses and display the assignee initials/name cleanly on task rows and Kanban cards.
+
+### R4. Impeccable Anti-AI-Slop Distill & Polish Across All Surfaces
+Apply `impeccable` (`craft-floor.md`, `distill.md`, and `polish.md`) to eliminate every "AI slop" tell across `frontend/src/`:
+1. **Kill Generic Tailwind Indigo/Blurple (`#6366f1`) Saturation**: Replace default `indigo-500`/`indigo-600` primary fills and badges with a refined architectural studio palette (e.g., high-contrast ink/graphite `#141824` / `#f8fafc` primary actions or deep cobalt/vermilion/emerald functional accents with restrained neutral surfaces). Primary CTAs must look like crisp software controls (`h-9` / `h-10`, `rounded-lg`), never bloated pill buttons.
+2. **Eliminate Badge, Pill & Icon-Box Soup**:
+   - Remove redundant inline pills next to page titles (e.g., delete `[Painel principal]` next to `Visão geral` and delete `[⚡ Prioridade em foco]` under the focus title).
+   - Remove decorative icons next to section headings (`CalendarIcon`, `Sparkles`, `Zap`, etc.). Let typography and weight establish hierarchy.
+   - In `Tarefas em Foco` (`DashboardOverviewPage.tsx`), remove the repetitive `[✓ Foco]` square icon box repeated on every undated row; use a clean tabular index (`01`, `02`...) or status dot + concise project/stage metadata, and show a date badge only when a real `dueDate` exists.
+   - Distill `Recursos em Avaliação (Em breve)` from a bulky 3-row icon-box card with verbose AI descriptions into a compact, single-block muted footer strip (`Em breve: Produtividade · Sequência · Relógio de foco`).
+3. **Remove Sci-Fi/Fantasy Wallpaper Bleed Behind Text**:
+   - Remove full-bleed sci-fi mountain/planet images (`/assets/overview-hero.jpg`, etc.) from behind the typography in `DashboardOverviewPage.tsx` and `ProjectList.tsx`. Keep text surfaces 100% clean, architectural, and high-contrast. Use discreet, editorial abstract/geometric thumbnails (`4:3` or compact header strips) only where they belong (sidebar thumbnails and project/academic cards).
+4. **Fix Fake/Static Data Visualizations & Verbose AI Copy**:
+   - In `Status dos Projetos`, replace any static `border-8` ring with a true proportional multi-segment SVG ring or a crisp hairlined horizontal/tabular breakdown that accurately reflects `active`, `planning`, and `completed` ratios.
+   - Cut verbose, robotic helper copy in half across headers, empty states, and banners (no sentences explaining how to click a button right above the button).
+
+### R5. Studio UI for Auth, Collaborators & Task Assignees
+Build the new authentication and collaboration flows using the distilled, anti-slop studio language:
+- **Auth screen**: Crisp, minimal login and registration view (`14px` `.bb-panel`, high-contrast inputs, zero marketing fluff or AI clichés, plus quick demo login option for `admin@brainboard.local`).
+- **Shell identity**: Compact user profile indicator (avatar initials + name/email) and account switch / logout button in the committed left sidebar (`Navbar.tsx`).
+- **Project Collaborators UI**: Compact avatar stack on project headers/cards and a clean Collaborators modal (`KanbanBoard.tsx` / `TopHeader.tsx` / `ProjectCard.tsx`) to invite registered users by email/name, view roles (`Owner` / `Colaborador`), and remove collaborators.
+- **Task Assignee UI**: Collaborator selector in `CreateTaskModal.tsx` and quick assignee switcher/badge on `TaskCard.tsx` and `SprintKanbanView.tsx`.
+
+### R6. Repository & Operational Constraints
+Follow `AGENTS.md`: never run `git push`, never open visible PowerShell/CMD windows, keep total subagents within the repository ceiling, preserve existing features and data, and update `DESIGN.md` to reflect the distilled anti-slop token system.
+
+## Verification Resources
+
+- Database & Backend build/validation:
+  - `npx --prefix backend prisma validate`
+  - `npx --prefix backend prisma db push`
+  - `npm --prefix backend run build`
+- Frontend build & typecheck:
+  - `npm --prefix frontend run build`
+- Formatting & diff check:
+  - `git diff --check`
+- Impeccable mechanical craft detector:
+  - `C:\Users\Kaue\.gemini\skills\impeccable\scripts\impeccable.cmd detect --target frontend/src --json`
+- Live environment:
+  - Backend API on `http://localhost:3000` (`/api/health`) and Frontend dev server on `http://localhost:5173`
+
+## Acceptance Criteria
+
+### Backend, Database & Multi-User Isolation
+- [ ] Prisma schema validates and pushes cleanly without data loss; both `backend` and `frontend` compile with zero TypeScript errors.
+- [ ] Programmatic API verification confirms end-to-end multi-user behavior:
+  1. Registering User A and User B succeeds and returns valid auth sessions/tokens.
+  2. A project created by User A is visible to User A in `GET /api/projects` and `GET /api/dashboard/overview`, and is **not** visible to User B before collaboration.
+  3. User A adding User B as a collaborator on the project makes the project immediately visible and accessible to User B in `GET /api/projects` and `GET /api/projects/:id`.
+  4. Assigning a project task to User B persists `assigneeId` and returns User B's user summary in task payloads.
+  5. Removing User B from the project revokes User B's access to the project and clears their task assignment in that project.
+
+### Impeccable Anti-AI-Slop & Visual Verification
+- [ ] `C:\Users\Kaue\.gemini\skills\impeccable\scripts\impeccable.cmd detect --target frontend/src --json` returns `[]` (zero craft violations).
+- [ ] Source inspection confirms zero default `indigo-500`/`indigo-600` button/badge saturation, zero sci-fi hero wallpaper behind text in `DashboardOverviewPage.tsx` and `ProjectList.tsx`, zero repetitive `[✓ Foco]` icon boxes on undated focus rows, and a compact distilled `Em breve` indicator.
+- [ ] Live browser verification at desktop (`1440x900`) and mobile (`390x844`) viewports in both light and dark themes confirms that Auth, Overview, Projects, Kanban Board (with Collaborators modal & Task Assignee), Focus, Calendar, and Academic views render with zero horizontal overflow and zero console errors.

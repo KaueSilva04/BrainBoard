@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build:
@@ -11,7 +9,7 @@ services:
       - "3000:3000"
     environment:
       - PORT=3000
-      - DATABASE_URL=${DATABASE_URL:-postgresql://neondb_owner:npg_6YesJQpTMRk4@ep-holy-mode-acy9p31p-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require}
+      - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL in the environment or ignored .env}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
       interval: 10s

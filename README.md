@@ -41,7 +41,7 @@ O repositório está estruturado como um **Monorepo** contendo Front e Back na m
 
 - **Frontend:** React, Vite, TypeScript, Tailwind CSS, Lucide React (Ícones).
 - **Backend:** Node.js, Express, TypeScript, Prisma ORM.
-- **Banco de Dados:** PostgreSQL (armazenamento persistente) e Redis (fila/cache).
+- **Banco de Dados:** PostgreSQL externo acessado pelo Prisma.
 - **Infraestrutura:** Orquestrado via `docker-compose`.
 
 ---
@@ -61,7 +61,7 @@ O repositório está estruturado como um **Monorepo** contendo Front e Back na m
    ```bash
    docker-compose up --build -d
    ```
-   *O Docker fará o download das imagens do Postgres/Redis e compilará o Backend e o Frontend automaticamente.*
+   *O Docker compilará o backend e o frontend. Configure `DATABASE_URL` para apontar para seu PostgreSQL antes de iniciar.*
 
 3. **Acesse as aplicações:**
    - **Frontend (Interface):** `http://localhost:5173`
@@ -77,7 +77,7 @@ Se você utiliza assistentes habilitados para MCP, adicione a seguinte configura
 - **Protocolo:** SSE (Server-Sent Events)
 - **URL:** `http://localhost:3000/mcp/sse`
 
-Imediatamente após a conexão, a IA receberá o catálogo atualizado com 23 ferramentas disponíveis para manipular o BrainBoard a seu favor!
+Após a conexão, o cliente recebe o catálogo de ferramentas MCP disponibilizadas pelo backend.
 
 ---
 *Construído com automação e IA em mente.*

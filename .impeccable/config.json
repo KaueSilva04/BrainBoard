@@ -1,0 +1,44 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "ai-color-palette",
+        "value": "*",
+        "files": [
+          "frontend/src/components/DashboardOverviewPage.tsx"
+        ],
+        "createdAt": "2026-10-16T00:50:31.836Z",
+        "reason": "REDESIGN_PLAN.md calls for semantic status colors; this view uses labeled active=cyan, planning=indigo, completed=emerald project categories and indigo as the shared interaction accent. The decorative multicolor fallback was removed."
+      },
+      {
+        "rule": "ai-color-palette",
+        "value": "*",
+        "files": [
+          "frontend/src/components/sprint/SprintKanbanView.tsx"
+        ],
+        "createdAt": "2026-10-16T00:50:35.221Z",
+        "reason": "Task status colors are intentional and labeled in the UI: amber=TODO, indigo=IN_PROGRESS, emerald=DONE; emerald is also the labeled completion KPI. This matches the semantic status color roles required by REDESIGN_PLAN.md."
+      },
+      {
+        "rule": "ai-color-palette",
+        "value": "*",
+        "files": [
+          "frontend/src/components/KanbanBoard.tsx"
+        ],
+        "createdAt": "2026-10-16T01:00:51.289Z",
+        "reason": "REDESIGN_PLAN.md and the established interface use indigo as the shared interaction accent; this finding points to the labeled Quadro de tarefas icon (indigo text color), with no violet gradient or cyan-on-dark palette combination at this line."
+      },
+      {
+        "rule": "ai-color-palette",
+        "value": "*",
+        "files": [
+          "frontend/src/components/academic/AcademicView.tsx"
+        ],
+        "createdAt": "2026-10-16T02:35:46.178Z",
+        "reason": "False positive at the cited line: indigo labels the semantic IN_PROGRESS state (Em andamento), with the Clock icon and explicit text; REDESIGN_PLAN.md permits status and subject accents. This is not decorative palette treatment."
+      }
+    ]
+  }
+}
