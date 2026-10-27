@@ -61,7 +61,7 @@ export class AcademicService {
   // --- ASSIGNMENTS ---
   async listAssignments(subjectId?: string) {
     return prisma.academicAssignment.findMany({
-      where: subjectId ? { subjectId } : undefined,
+      ...(subjectId ? { where: { subjectId } } : {}),
       orderBy: { dueDate: 'asc' },
     });
   }

@@ -44,4 +44,5 @@ export interface CalendarFilterOptions {
   includeCompleted?: boolean | undefined;
   projectId?: string | undefined;
   subjectId?: string | undefined;
+  userId?: string | undefined;
 }

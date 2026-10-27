@@ -9,6 +9,7 @@ import type {
   StageStatus,
   Status,
   ProjectType,
+  ProjectMemberRole,
 } from '@prisma/client';
 
 export type {
@@ -22,7 +23,23 @@ export type {
   StageStatus,
   Status,
   ProjectType,
+  ProjectMemberRole,
 };
+
+export interface UserSummary {
+  id: string;
+  name: string;
+  email: string;
+  avatarColor: string | null;
+}
+
+export interface ProjectMemberSummary {
+  id: string;
+  userId: string;
+  role: ProjectMemberRole;
+  joinedAt: Date | string;
+  user: UserSummary;
+}
 
 export interface CreateProjectInput {
   title: string;
@@ -32,6 +49,7 @@ export interface CreateProjectInput {
   type?: ProjectType | string | undefined;
   githubRepo?: string | null | undefined;
   settings?: any | undefined;
+  ownerId?: string | null | undefined;
 }
 
 export interface UpdateProjectInput {
@@ -47,10 +65,13 @@ export interface UpdateProjectInput {
 export interface ProjectFilterOptions {
   status?: string | undefined;
   type?: ProjectType | string | undefined;
+  userId?: string | undefined;
 }
 
 export type ProjectWithDetails = Project & {
-  stages: (Stage & { tasks: (Task & { subtasks: Subtask[] })[] })[];
+  owner?: UserSummary | null;
+  collaborators?: ProjectMemberSummary[];
+  stages: (Stage & { tasks: (Task & { subtasks: Subtask[]; assignee?: UserSummary | null })[] })[];
   updateLogs: UpdateLog[];
   members: Member[];
 };
@@ -69,7 +90,7 @@ export interface UpdateStageInput {
 }
 
 export type StageWithTasks = Stage & {
-  tasks: (Task & { subtasks: Subtask[] })[];
+  tasks: (Task & { subtasks: Subtask[]; assignee?: UserSummary | null })[];
 };
 
 export interface CreateTaskInput {
@@ -79,6 +100,7 @@ export interface CreateTaskInput {
   status?: string | undefined;
   dueDate?: Date | string | null | undefined;
   isSprintActive?: boolean | undefined;
+  assigneeId?: string | null | undefined;
 }
 
 export interface UpdateTaskInput {
@@ -88,6 +110,7 @@ export interface UpdateTaskInput {
   status?: string | undefined;
   dueDate?: Date | string | null | undefined;
   isSprintActive?: boolean | undefined;
+  assigneeId?: string | null | undefined;
 }
 
 export interface TaskFilterOptions {
@@ -96,11 +119,13 @@ export interface TaskFilterOptions {
   status?: string | undefined;
   isSprintActive?: boolean | undefined;
   hasDueDate?: boolean | undefined;
+  userId?: string | undefined;
 }
 
 export type TaskWithSubtasks = Task & {
   subtasks: Subtask[];
   stage?: Stage;
+  assignee?: UserSummary | null;
 };
 
 export interface CreateMemberInput {

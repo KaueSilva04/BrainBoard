@@ -2,6 +2,7 @@ import { ProjectStatus, ProjectType } from '@prisma/client';
 import type { Project, Prisma } from '@prisma/client';
 import { prisma } from '../../../prisma.js';
 import { ValidationError, NotFoundError } from '../../shared/errors.js';
+import { validateTextEncoding } from '../../shared/text-encoding.js';
 import type {
   CreateProjectInput,
   UpdateProjectInput,
@@ -12,9 +13,44 @@ import type {
 export const VALID_PROJECT_STATUSES: ProjectStatus[] = ['PLANNING', 'ACTIVE', 'COMPLETED'];
 export const VALID_PROJECT_TYPES: ProjectType[] = ['SOFTWARE'];
 
+const USER_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  avatarColor: true,
+};
+
+const PROJECT_DETAILS_INCLUDE = {
+  owner: { select: USER_SELECT },
+  collaborators: {
+    include: {
+      user: { select: USER_SELECT },
+    },
+    orderBy: { joinedAt: 'asc' as const },
+  },
+  stages: {
+    orderBy: { order: 'asc' as const },
+    include: {
+      tasks: {
+        orderBy: { createdAt: 'asc' as const },
+        include: {
+          subtasks: { orderBy: { createdAt: 'asc' as const } },
+          assignee: { select: USER_SELECT },
+        },
+      },
+    },
+  },
+  updateLogs: {
+    orderBy: { createdAt: 'desc' as const },
+  },
+  members: {
+    orderBy: { createdAt: 'asc' as const },
+  },
+};
+
 export class ProjectService {
   async listProjects(filters?: ProjectFilterOptions): Promise<ProjectWithDetails[]> {
-    const where: { status?: ProjectStatus; type?: ProjectType } = {};
+    const where: any = {};
 
     if (filters?.status) {
       if (!VALID_PROJECT_STATUSES.includes(filters.status as ProjectStatus)) {
@@ -34,57 +70,47 @@ export class ProjectService {
       where.type = filters.type as ProjectType;
     }
 
-    return await prisma.project.findMany({
+    if (filters?.userId) {
+      where.OR = [
+        { ownerId: filters.userId },
+        { collaborators: { some: { userId: filters.userId } } },
+      ];
+    }
+
+    const projects = await prisma.project.findMany({
       where,
-      include: {
-        stages: {
-          orderBy: { order: 'asc' },
-          include: {
-            tasks: {
-              orderBy: { createdAt: 'asc' },
-              include: { subtasks: { orderBy: { createdAt: 'asc' } } },
-            },
-          },
-        },
-        updateLogs: {
-          orderBy: { createdAt: 'desc' },
-        },
-        members: {
-          orderBy: { createdAt: 'asc' },
-        },
-      },
+      include: PROJECT_DETAILS_INCLUDE,
       orderBy: { createdAt: 'desc' },
     });
+
+    return projects as unknown as ProjectWithDetails[];
   }
 
-  async getProjectById(id: string): Promise<ProjectWithDetails | null> {
+  async getProjectById(id: string, userId?: string): Promise<ProjectWithDetails | null> {
     if (!id || typeof id !== 'string') {
       throw new ValidationError('Project ID is required');
     }
 
-    return await prisma.project.findUnique({
+    const project = await prisma.project.findUnique({
       where: { id },
-      include: {
-        stages: {
-          orderBy: { order: 'asc' },
-          include: {
-            tasks: {
-              orderBy: { createdAt: 'asc' },
-              include: { subtasks: { orderBy: { createdAt: 'asc' } } },
-            },
-          },
-        },
-        updateLogs: {
-          orderBy: { createdAt: 'desc' },
-        },
-        members: {
-          orderBy: { createdAt: 'asc' },
-        },
-      },
+      include: PROJECT_DETAILS_INCLUDE,
     });
+
+    if (!project) return null;
+
+    if (userId) {
+      const isOwner = project.ownerId === userId;
+      const isCollab = project.collaborators.some((c) => c.userId === userId);
+      if (!isOwner && !isCollab) {
+        return null;
+      }
+    }
+
+    return project as unknown as ProjectWithDetails;
   }
 
   async createProject(data: CreateProjectInput): Promise<ProjectWithDetails> {
+    validateTextEncoding({ title: data.title, description: data.description, businessLogic: data.businessLogic });
     if (!data.title || typeof data.title !== 'string' || !data.title.trim()) {
       throw new ValidationError('Title is required');
     }
@@ -125,8 +151,9 @@ export class ProjectService {
         : null;
 
     const settings = data.settings !== undefined ? (data.settings as Prisma.InputJsonValue) : undefined;
+    const ownerId = data.ownerId || null;
 
-    return await prisma.project.create({
+    const project = await prisma.project.create({
       data: {
         title: data.title.trim(),
         description,
@@ -134,26 +161,45 @@ export class ProjectService {
         status,
         type,
         githubRepo,
+        ownerId,
         ...(settings !== undefined ? { settings } : {}),
+        ...(ownerId
+          ? {
+              collaborators: {
+                create: {
+                  userId: ownerId,
+                  role: 'OWNER',
+                },
+              },
+            }
+          : {}),
       },
-      include: {
-        stages: {
-          orderBy: { order: 'asc' },
-          include: {
-            tasks: {
-              include: { subtasks: true },
-            },
-          },
-        },
-        updateLogs: true,
-        members: true,
-      },
+      include: PROJECT_DETAILS_INCLUDE,
     });
+
+    return project as unknown as ProjectWithDetails;
   }
 
-  async updateProject(id: string, data: UpdateProjectInput): Promise<ProjectWithDetails> {
+  async updateProject(id: string, data: UpdateProjectInput, userId?: string): Promise<ProjectWithDetails> {
+    validateTextEncoding({ title: data.title, description: data.description, businessLogic: data.businessLogic });
     if (!id || typeof id !== 'string') {
       throw new ValidationError('Project ID is required');
+    }
+
+    if (userId) {
+      const existing = await prisma.project.findUnique({
+        where: { id },
+        select: {
+          ownerId: true,
+          collaborators: { where: { userId }, select: { id: true } },
+        },
+      });
+      if (!existing) {
+        throw new NotFoundError('Project not found');
+      }
+      if (existing.ownerId !== userId && existing.collaborators.length === 0) {
+        throw new ValidationError('Acesso negado ao projeto');
+      }
     }
 
     const updateData: {
@@ -211,24 +257,12 @@ export class ProjectService {
     }
 
     try {
-      return await prisma.project.update({
+      const updated = await prisma.project.update({
         where: { id },
         data: updateData,
-        include: {
-          stages: {
-            orderBy: { order: 'asc' },
-            include: {
-              tasks: {
-                include: { subtasks: true },
-              },
-            },
-          },
-          updateLogs: {
-            orderBy: { createdAt: 'desc' },
-          },
-          members: true,
-        },
+        include: PROJECT_DETAILS_INCLUDE,
       });
+      return updated as unknown as ProjectWithDetails;
     } catch (error: any) {
       if (error && typeof error === 'object' && 'code' in error && error.code === 'P2025') {
         throw new NotFoundError('Project not found');
@@ -237,12 +271,29 @@ export class ProjectService {
     }
   }
 
-  async updateBusinessLogic(id: string, businessLogic: string): Promise<Project> {
+  async updateBusinessLogic(id: string, businessLogic: string, userId?: string): Promise<Project> {
+    validateTextEncoding({ businessLogic });
     if (!id || typeof id !== 'string') {
       throw new ValidationError('Project ID is required');
     }
     if (typeof businessLogic !== 'string') {
       throw new ValidationError('Business logic must be a string');
+    }
+
+    if (userId) {
+      const existing = await prisma.project.findUnique({
+        where: { id },
+        select: {
+          ownerId: true,
+          collaborators: { where: { userId }, select: { id: true } },
+        },
+      });
+      if (!existing) {
+        throw new NotFoundError('Project not found');
+      }
+      if (existing.ownerId !== userId && existing.collaborators.length === 0) {
+        throw new ValidationError('Acesso negado ao projeto');
+      }
     }
 
     try {
@@ -260,10 +311,28 @@ export class ProjectService {
 
   async updateProjectSettings(
     id: string,
-    data: { githubRepo?: string | null | undefined; settings?: any | undefined; businessLogic?: string | null | undefined }
+    data: { githubRepo?: string | null | undefined; settings?: any | undefined; businessLogic?: string | null | undefined },
+    userId?: string
   ): Promise<Project> {
+    validateTextEncoding({ businessLogic: data.businessLogic });
     if (!id || typeof id !== 'string') {
       throw new ValidationError('Project ID is required');
+    }
+
+    if (userId) {
+      const existing = await prisma.project.findUnique({
+        where: { id },
+        select: {
+          ownerId: true,
+          collaborators: { where: { userId }, select: { id: true } },
+        },
+      });
+      if (!existing) {
+        throw new NotFoundError('Project not found');
+      }
+      if (existing.ownerId !== userId && existing.collaborators.length === 0) {
+        throw new ValidationError('Acesso negado ao projeto');
+      }
     }
 
     const updateData: {
@@ -295,9 +364,22 @@ export class ProjectService {
     }
   }
 
-  async deleteProject(id: string): Promise<Project> {
+  async deleteProject(id: string, userId?: string): Promise<Project> {
     if (!id || typeof id !== 'string') {
       throw new ValidationError('Project ID is required');
+    }
+
+    const project = await prisma.project.findUnique({
+      where: { id },
+      select: { id: true, ownerId: true },
+    });
+
+    if (!project) {
+      throw new NotFoundError('Project not found');
+    }
+
+    if (userId && project.ownerId && project.ownerId !== userId) {
+      throw new ValidationError('Apenas o proprietário pode excluir o projeto');
     }
 
     try {

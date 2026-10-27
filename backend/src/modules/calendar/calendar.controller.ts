@@ -103,6 +103,7 @@ export const getCalendarEvents = async (req: Request, res: Response) => {
       endDate: endDate as string,
       includeCompleted: includeCompleted === 'true',
       projectId: projectId ? String(projectId).trim() : undefined,
+      userId: req.user?.id,
     });
     res.json(events);
   } catch (error: any) {

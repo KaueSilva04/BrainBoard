@@ -22,6 +22,12 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { projectsRouter } from './modules/projects/projects.router.js';
 import { academicRouter } from './modules/academic/academic.router.js';
 import { calendarRouter } from './modules/calendar/calendar.router.js';
+import { dashboardRouter } from './modules/dashboard/dashboard.router.js';
+import { authRouter } from './modules/auth/auth.router.js';
+import { authService } from './modules/auth/auth.service.js';
+import { authMiddleware, optionalAuthMiddleware, resolveMcpUser } from './modules/auth/auth.middleware.js';
+import { collaboratorService } from './modules/projects/services/collaborator.service.js';
+import { ensureDefaultOwnerAndBackfill } from './services/backfill.service.js';
 import { serveDocumentation } from './modules/shared/docs.js';
 import { ValidationError, NotFoundError } from './modules/shared/errors.js';
 
@@ -37,6 +43,12 @@ export {
   appointmentService,
   calendarService,
   academicService,
+  collaboratorService,
+  authService,
+  authMiddleware,
+  optionalAuthMiddleware,
+  authRouter,
+  ensureDefaultOwnerAndBackfill,
   createMcpServer,
   mcpServer,
   sseTransports,
@@ -49,6 +61,7 @@ const port = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
+app.use(optionalAuthMiddleware);
 
 // Documentation
 app.get('/docs', serveDocumentation);
@@ -62,15 +75,23 @@ app.get('/api/health', (req, res) => {
 });
 
 // Domain Routers
+app.use(authRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/users', authRouter);
 app.use(projectsRouter);
 app.use('/api/academic', academicRouter);
 app.use(calendarRouter);
+app.use(dashboardRouter);
 
 // MCP Transports
 app.get('/mcp/sse', async (req, res) => {
+  const mcpUser = await resolveMcpUser(req);
+  if (!mcpUser && process.env.REQUIRE_MCP_AUTH === 'true') {
+    return res.status(401).json({ error: 'Autenticação necessária para o servidor MCP' });
+  }
   const transport = new SSEServerTransport('/mcp/messages', res as any);
   sseTransports.set(transport.sessionId, transport);
-  const server = createMcpServer();
+  const server = createMcpServer(mcpUser?.id);
   res.on('close', () => {
     sseTransports.delete(transport.sessionId);
     server.close().catch(() => {});
@@ -123,6 +144,18 @@ export const CONTRACT_REGISTRY = {
     "app.patch('/api/subtasks/:id'",
     "app.get('/mcp/sse'",
     "app.post('/mcp/messages'",
+    "app.post('/api/auth/register'",
+    "app.post('/api/auth/login'",
+    "app.post('/api/auth/logout'",
+    "app.get('/api/auth/me'",
+    "app.get('/api/users/search'",
+    "app.get('/api/projects/:id/collaborators'",
+    "app.post('/api/projects/:id/collaborators'",
+    "app.delete('/api/projects/:id/collaborators/:userId'",
+    "app.delete('/api/projects/:id'",
+    "app.delete('/api/stages/:id'",
+    "app.delete('/api/tasks/:id'",
+    "app.delete('/api/subtasks/:id'",
   ],
   tools: [
     'read_project_context',
@@ -176,6 +209,8 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   }
   res.status(500).json({ error: err.message || 'Internal server error' });
 });
+
+await ensureDefaultOwnerAndBackfill();
 
 app.listen(port, () => {
   console.log(`Backend BrainBoard Modular Monolith running on http://localhost:${port}`);

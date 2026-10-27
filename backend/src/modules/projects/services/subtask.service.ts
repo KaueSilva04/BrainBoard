@@ -1,6 +1,7 @@
 import type { Subtask } from '@prisma/client';
 import { prisma } from '../../../prisma.js';
 import { ValidationError, NotFoundError } from '../../shared/errors.js';
+import { validateTextEncoding } from '../../shared/text-encoding.js';
 
 export class SubtaskService {
   async getSubtaskById(id: string): Promise<Subtask | null> {
@@ -14,6 +15,7 @@ export class SubtaskService {
   }
 
   async createSubtask(taskId: string, title: string): Promise<Subtask> {
+    validateTextEncoding({ title });
     if (!taskId || typeof taskId !== 'string') {
       throw new ValidationError('Task ID is required');
     }
@@ -42,7 +44,11 @@ export class SubtaskService {
     }
   }
 
-  async toggleSubtask(id: string, isDone?: boolean): Promise<Subtask> {
+  async updateSubtask(id: string, data: { title?: string; isDone?: boolean }): Promise<Subtask> {
+    validateTextEncoding({ title: data.title });
+    if (data.title !== undefined && (typeof data.title !== 'string' || !data.title.trim())) {
+      throw new ValidationError('Title cannot be empty');
+    }
     if (!id || typeof id !== 'string') {
       throw new ValidationError('Subtask ID is required');
     }
@@ -52,12 +58,17 @@ export class SubtaskService {
       throw new NotFoundError('Subtask not found');
     }
 
-    const newStatus = typeof isDone === 'boolean' ? isDone : !current.isDone;
+    const newStatus = typeof data.isDone === 'boolean'
+      ? data.isDone
+      : data.title !== undefined ? current.isDone : !current.isDone;
 
     try {
       return await prisma.subtask.update({
         where: { id },
-        data: { isDone: newStatus },
+        data: {
+          isDone: newStatus,
+          ...(data.title !== undefined ? { title: data.title.trim() } : {}),
+        },
       });
     } catch (error: any) {
       if (error && typeof error === 'object' && 'code' in error && error.code === 'P2025') {
@@ -82,6 +93,10 @@ export class SubtaskService {
       }
       throw error;
     }
+  }
+
+  async toggleSubtask(id: string, isDone?: boolean): Promise<Subtask> {
+    return this.updateSubtask(id, isDone === undefined ? {} : { isDone });
   }
 }
 

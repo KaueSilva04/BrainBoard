@@ -2,6 +2,7 @@ import { StageStatus } from '@prisma/client';
 import type { Stage } from '@prisma/client';
 import { prisma } from '../../../prisma.js';
 import { ValidationError, NotFoundError } from '../../shared/errors.js';
+import { validateTextEncoding } from '../../shared/text-encoding.js';
 import type {
   CreateStageInput,
   UpdateStageInput,
@@ -61,6 +62,7 @@ export class StageService {
   }
 
   async createStage(data: CreateStageInput): Promise<StageWithTasks> {
+    validateTextEncoding({ title: data.title });
     if (!data.projectId || typeof data.projectId !== 'string') {
       throw new ValidationError('Project ID is required');
     }
@@ -115,6 +117,7 @@ export class StageService {
   }
 
   async updateStage(id: string, data: UpdateStageInput): Promise<StageWithTasks> {
+    validateTextEncoding({ title: data.title });
     if (!id || typeof id !== 'string') {
       throw new ValidationError('Stage ID is required');
     }

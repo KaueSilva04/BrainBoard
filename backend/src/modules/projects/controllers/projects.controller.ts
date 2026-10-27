@@ -5,6 +5,7 @@ import { updateLogService } from '../services/update-log.service.js';
 import { memberService } from '../services/member.service.js';
 import { taskService, VALID_STATUSES } from '../services/task.service.js';
 import { subtaskService } from '../services/subtask.service.js';
+import { collaboratorService } from '../services/collaborator.service.js';
 import { ValidationError, NotFoundError } from '../../shared/errors.js';
 
 // ==========================================
@@ -30,6 +31,7 @@ export const listProjects = async (req: Request, res: Response) => {
     const projects = await projectService.listProjects({
       status,
       type,
+      userId: req.user?.id,
     });
     res.json(projects);
   } catch (error: any) {
@@ -43,7 +45,7 @@ export const listProjects = async (req: Request, res: Response) => {
 export const getProjectById = async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
-    const project = await projectService.getProjectById(id);
+    const project = await projectService.getProjectById(id, req.user?.id);
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
@@ -82,6 +84,7 @@ export const createProject = async (req: Request, res: Response) => {
       type,
       githubRepo,
       settings,
+      ownerId: req.user?.id,
     });
     res.status(201).json(project);
   } catch (error: any) {
@@ -119,7 +122,7 @@ export const updateProject = async (req: Request, res: Response) => {
       type,
       githubRepo,
       settings,
-    });
+    }, req.user?.id);
     res.json(project);
   } catch (error: any) {
     if (error instanceof ValidationError) {
@@ -140,7 +143,7 @@ export const updateBusinessLogic = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'businessLogic string is required' });
     }
 
-    const project = await projectService.updateBusinessLogic(id, businessLogic);
+    const project = await projectService.updateBusinessLogic(id, businessLogic, req.user?.id);
     res.json(project);
   } catch (error: any) {
     if (error instanceof ValidationError) {
@@ -162,7 +165,7 @@ export const updateProjectSettings = async (req: Request, res: Response) => {
       githubRepo,
       settings,
       businessLogic,
-    });
+    }, req.user?.id);
     res.json(project);
   } catch (error: any) {
     if (error instanceof ValidationError) {
@@ -178,13 +181,83 @@ export const updateProjectSettings = async (req: Request, res: Response) => {
 export const deleteProject = async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
-    await projectService.deleteProject(id);
+    await projectService.deleteProject(id, req.user?.id);
     res.status(204).send();
   } catch (error: any) {
+    if (error instanceof ValidationError) {
+      return res.status(403).json({ error: error.message });
+    }
     if (error instanceof NotFoundError || (error && typeof error === 'object' && 'code' in error && error.code === 'P2025')) {
       return res.status(404).json({ error: 'Project not found' });
     }
     res.status(500).json({ error: error.message });
+  }
+};
+
+// ==========================================
+// COLLABORATORS CONTROLLER
+// ==========================================
+
+export const getProjectCollaborators = async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const userId = req.user?.id;
+    const collaborators = await collaboratorService.getProjectCollaborators(id, userId);
+    res.json(collaborators);
+  } catch (error: any) {
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error instanceof ValidationError) {
+      return res.status(403).json({ error: error.message });
+    }
+    res.status(500).json({ error: error.message || 'Erro ao listar colaboradores' });
+  }
+};
+
+export const addCollaborator = async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const requestingUserId = req.user?.id;
+    if (!requestingUserId) {
+      return res.status(401).json({ error: 'Autenticação necessária' });
+    }
+    const { email, userId, role } = req.body;
+    const collaborator = await collaboratorService.addCollaborator(id, requestingUserId, {
+      email,
+      userId,
+      role,
+    });
+    res.status(201).json(collaborator);
+  } catch (error: any) {
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
+    res.status(500).json({ error: error.message || 'Erro ao adicionar colaborador' });
+  }
+};
+
+export const removeCollaborator = async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const targetUserId = String(req.params.userId);
+    const requestingUserId = req.user?.id;
+    if (!requestingUserId) {
+      return res.status(401).json({ error: 'Autenticação necessária' });
+    }
+    const result = await collaboratorService.removeCollaborator(id, requestingUserId, targetUserId);
+    res.json(result);
+  } catch (error: any) {
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
+    res.status(500).json({ error: error.message || 'Erro ao remover colaborador' });
   }
 };
 
@@ -505,6 +578,7 @@ export const listTasks = async (req: Request, res: Response) => {
       status: statusStr,
       isSprintActive: isSprintActive !== undefined ? isSprintActive === 'true' : undefined,
       hasDueDate: hasDueDate !== undefined ? hasDueDate === 'true' : undefined,
+      userId: req.user?.id,
     });
     res.json(tasks);
   } catch (error: any) {
@@ -547,7 +621,7 @@ export const getTaskById = async (req: Request, res: Response) => {
 export const createTask = async (req: Request, res: Response) => {
   try {
     const stageIdFromParams = req.params?.stageId;
-    const { title, stageId: stageIdFromBody, description, status, dueDate, isSprintActive } = req.body;
+    const { title, stageId: stageIdFromBody, description, status, dueDate, isSprintActive, assigneeId } = req.body;
     const rawStageId = stageIdFromParams || stageIdFromBody;
     const stageId = rawStageId ? String(rawStageId).trim() : '';
 
@@ -570,6 +644,7 @@ export const createTask = async (req: Request, res: Response) => {
       status,
       dueDate,
       isSprintActive,
+      assigneeId,
     });
     res.status(201).json(task);
   } catch (error: any) {
@@ -586,7 +661,7 @@ export const createTask = async (req: Request, res: Response) => {
 export const updateTask = async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
-    const { status, title, description, stageId, dueDate, isSprintActive } = req.body;
+    const { status, title, description, stageId, dueDate, isSprintActive, assigneeId } = req.body;
 
     if (status !== undefined && !VALID_STATUSES.includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
@@ -602,6 +677,7 @@ export const updateTask = async (req: Request, res: Response) => {
       stageId,
       dueDate,
       isSprintActive,
+      assigneeId,
     });
     res.json(task);
   } catch (error: any) {
@@ -677,7 +753,9 @@ export const toggleSubtask = async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
     const isDone = typeof req.body.isDone === 'boolean' ? req.body.isDone : undefined;
-    const subtask = await subtaskService.toggleSubtask(id, isDone);
+    const subtask = req.body.title !== undefined
+      ? await subtaskService.updateSubtask(id, { title: req.body.title, ...(isDone !== undefined ? { isDone } : {}) })
+      : await subtaskService.toggleSubtask(id, isDone);
     res.json(subtask);
   } catch (error: any) {
     if (error instanceof ValidationError) {
