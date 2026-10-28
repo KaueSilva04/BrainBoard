@@ -1,16 +1,24 @@
-import React, { useState } from 'react';
-import { Plus, Milestone, Layers } from 'lucide-react';
-import type { Project, Stage, Task, TaskStatus } from '../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Plus, Milestone, Users, Filter, X, Flame, Tag, UserCheck } from 'lucide-react';
+import type { Project, Stage, Task, TaskStatus, ProjectCollaborator } from '../types';
+import { TASK_STATUS_LABELS, getTaskTags, getTagBadgeClasses } from '../types';
 import { KanbanColumn } from './KanbanColumn';
 import { StageColumn } from './StageColumn';
 import { DashboardOverview } from './DashboardOverview';
+import { AvatarStack } from './collaborators/AvatarStack';
 
 export interface KanbanBoardProps {
   project?: Project | null;
   stages: Stage[];
   tasks: Task[];
+  summaryTasks?: Task[];
+  collaborators?: ProjectCollaborator[];
+  onOpenCollaboratorsModal?: () => void;
   onMoveTask: (id: string, status: TaskStatus) => Promise<void>;
+  onMoveTaskToStage?: (taskId: string, targetStageId: string) => Promise<void>;
+  onUpdateTaskTags?: (taskId: string, tags: string[]) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
+  onDeleteStage?: (stageId: string, stageTitle: string) => Promise<void>;
   onAddSubtask: (taskId: string, title: string) => Promise<void>;
   onToggleSubtask: (id: string, isDone: boolean) => Promise<void>;
   onDeleteSubtask?: (id: string) => Promise<void>;
@@ -18,25 +26,90 @@ export interface KanbanBoardProps {
   onOpenCreateStage?: () => void;
   onOpenCreateModal?: () => void;
   selectedCategory?: string;
+  searchQuery?: string;
 }
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
-  project,
   stages,
   tasks,
+  summaryTasks = tasks,
+  collaborators = [],
+  onOpenCollaboratorsModal,
   onMoveTask,
+  onMoveTaskToStage,
+  onUpdateTaskTags,
   onDeleteTask,
+  onDeleteStage,
   onAddSubtask,
   onToggleSubtask,
   onDeleteSubtask,
   onOpenCreateTask,
   onOpenCreateStage,
   onOpenCreateModal,
+  searchQuery = '',
 }) => {
-  const [boardView, setBoardView] = useState<'STAGES' | 'STATUS'>('STATUS');
-  const todoTasks = tasks.filter((t) => t.status === 'TODO');
-  const inProgressTasks = tasks.filter((t) => t.status === 'IN_PROGRESS');
-  const doneTasks = tasks.filter((t) => t.status === 'DONE');
+  const [boardView, setBoardView] = useState<'STAGES' | 'STATUS'>(stages.length === 0 ? 'STAGES' : 'STATUS');
+  const [selectedStageId, setSelectedStageId] = useState<string>('ALL');
+  const [selectedStatus, setSelectedStatus] = useState<TaskStatus | 'ALL'>('ALL');
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>('ALL');
+  const [selectedTag, setSelectedTag] = useState<string>('ALL');
+  const [onlyFocus, setOnlyFocus] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (stages.length === 0) setBoardView('STAGES');
+  }, [stages.length]);
+
+  useEffect(() => {
+    if (selectedStageId !== 'ALL' && !stages.some((s) => s.id === selectedStageId)) {
+      setSelectedStageId('ALL');
+    }
+  }, [stages, selectedStageId]);
+
+  const availableTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    summaryTasks.forEach((t) => {
+      getTaskTags(t).forEach((tag) => tagSet.add(tag));
+    });
+    return Array.from(tagSet).sort();
+  }, [summaryTasks]);
+
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((t) => {
+      if (selectedStageId !== 'ALL' && t.stageId !== selectedStageId) return false;
+      if (selectedStatus !== 'ALL' && t.status !== selectedStatus) return false;
+      if (selectedAssigneeId === 'UNASSIGNED' && t.assigneeId) return false;
+      if (selectedAssigneeId !== 'ALL' && selectedAssigneeId !== 'UNASSIGNED' && t.assigneeId !== selectedAssigneeId) {
+        return false;
+      }
+      if (onlyFocus && !t.isSprintActive) return false;
+      if (selectedTag !== 'ALL' && !getTaskTags(t).includes(selectedTag)) return false;
+      return true;
+    });
+  }, [tasks, selectedStageId, selectedStatus, selectedAssigneeId, onlyFocus, selectedTag]);
+
+  const visibleStages = useMemo(() => {
+    if (selectedStageId === 'ALL') return stages;
+    return stages.filter((s) => s.id === selectedStageId);
+  }, [stages, selectedStageId]);
+
+  const activeFiltersCount =
+    (selectedStageId !== 'ALL' ? 1 : 0) +
+    (selectedStatus !== 'ALL' ? 1 : 0) +
+    (selectedAssigneeId !== 'ALL' ? 1 : 0) +
+    (selectedTag !== 'ALL' ? 1 : 0) +
+    (onlyFocus ? 1 : 0);
+
+  const clearFilters = () => {
+    setSelectedStageId('ALL');
+    setSelectedStatus('ALL');
+    setSelectedAssigneeId('ALL');
+    setSelectedTag('ALL');
+    setOnlyFocus(false);
+  };
+
+  const todoTasks = filteredTasks.filter((t) => t.status === 'TODO');
+  const inProgressTasks = filteredTasks.filter((t) => t.status === 'IN_PROGRESS');
+  const doneTasks = filteredTasks.filter((t) => t.status === 'DONE');
 
   const handleCreateTaskTrigger = (stageId?: string) => {
     if (onOpenCreateTask) {
@@ -47,70 +120,242 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   };
 
   return (
-    <div className="space-y-6 flex flex-col h-full">
+    <div className="flex flex-col gap-8 bb-page-enter motion-reduce:animate-none">
       {/* Dashboard Overview Metrics Section */}
-      <DashboardOverview tasks={tasks} />
+      {searchQuery.trim() && <p className="-mb-6 break-words text-sm text-slate-600 dark:text-slate-300 [overflow-wrap:anywhere]">A busca filtra somente os cartões do quadro; os indicadores abaixo consideram todas as tarefas do projeto.</p>}
+      <DashboardOverview tasks={summaryTasks} compactMobile />
 
-      {/* Modern Professional Board Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
-        <div className="flex items-center gap-4 flex-wrap">
-          
-
-
-          {/* Grouping Toggle */}
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-            <span className="hidden sm:inline">Agrupar por:</span>
-            <select
-              value={boardView}
-              onChange={(e) => setBoardView(e.target.value as 'STAGES' | 'STATUS')}
-              className="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer shadow-sm"
-            >
-              <option value="STATUS">Status (Kanban)</option>
-              <option value="STAGES">Etapas ({stages.length})</option>
-            </select>
-          </div>
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
+        <div>
+          <h2 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">Quadro de tarefas</h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Visualize o fluxo por status ou por etapa.</p>
         </div>
-
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-3">
+          <div aria-label="Agrupar tarefas" className="inline-flex rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-0.5">
+            <button type="button" onClick={() => setBoardView('STATUS')} disabled={stages.length === 0} aria-pressed={boardView === 'STATUS'} className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${boardView === 'STATUS' ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'}`}>Por status</button>
+            <button type="button" onClick={() => setBoardView('STAGES')} aria-pressed={boardView === 'STAGES'} className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${boardView === 'STAGES' ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'}`}>Por etapa</button>
+          </div>
+          {onOpenCollaboratorsModal && (
+            <button
+              type="button"
+              onClick={onOpenCollaboratorsModal}
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-sm font-medium text-slate-700 dark:text-slate-300 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              {collaborators && collaborators.length > 0 ? (
+                <AvatarStack collaborators={collaborators} max={3} size="sm" />
+              ) : (
+                <Users className="h-4 w-4 text-slate-500" />
+              )}
+              <span className="hidden sm:inline">Equipe</span>
+            </button>
+          )}
           {onOpenCreateStage && (
             <button
               type="button"
               onClick={onOpenCreateStage}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-sm transition-colors"
+              className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-sm font-medium text-slate-700 dark:text-slate-300 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Etapa</span>
+              <Plus className="h-4 w-4" />
+              <span>Nova etapa</span>
             </button>
           )}
           <button
             type="button"
             onClick={() => handleCreateTaskTrigger()}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-sm shadow-indigo-500/20 transition-all"
+            className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-slate-900 px-4 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
           >
-            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>Nova Tarefa</span>
+            <Plus className="h-4 w-4" />
+            <span>Nova tarefa</span>
           </button>
         </div>
       </div>
 
-      {/* Board Columns View */}
-      {boardView === 'STAGES' ? (
-        stages.length === 0 ? (
-          <div className="text-center py-16 px-4 bg-white rounded-3xl border border-slate-200/80 shadow-card">
-            <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center mx-auto mb-3.5">
-              <Milestone className="w-7 h-7" />
+      {/* Interactive Filter Bar (Stage Tags, Status, Assignee, Focus & Hashtags) */}
+      {stages.length > 0 && (
+        <div className="-mt-3 flex flex-col gap-3 rounded-xl border border-slate-200/80 bg-white/80 p-3.5 dark:border-slate-800/80 dark:bg-slate-900/70">
+          {/* Stage Tag Pills Row */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 mr-1">
+              <Milestone className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400" />
+              <span>Etapas:</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedStageId('ALL')}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                selectedStageId === 'ALL'
+                  ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                  : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+              }`}
+            >
+              <span>Todas</span>
+              <span className="bb-tabular font-mono text-[10px] opacity-80">({tasks.length})</span>
+            </button>
+            {stages.map((stage) => {
+              const count = tasks.filter((t) => t.stageId === stage.id).length;
+              const isSelected = selectedStageId === stage.id;
+              return (
+                <button
+                  key={stage.id}
+                  type="button"
+                  onClick={() => setSelectedStageId(isSelected ? 'ALL' : stage.id)}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                    isSelected
+                      ? 'bg-indigo-600 text-white shadow-xs dark:bg-indigo-500'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-300 dark:hover:border-indigo-700 dark:hover:text-indigo-400'
+                  }`}
+                >
+                  <span className="truncate max-w-[160px]">{stage.title}</span>
+                  <span
+                    className={`bb-tabular font-mono rounded-full px-1.5 py-0.2 text-[10px] ${
+                      isSelected
+                        ? 'bg-white/20 text-white'
+                        : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Secondary Filters Row: Status, Assignee, Focus, Hashtags & Reset */}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400 mr-1">
+                <Filter className="h-3.5 w-3.5" />
+                <span>Filtros:</span>
+              </span>
+
+              {/* Status Filter */}
+              <select
+                aria-label="Filtrar por status"
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value as TaskStatus | 'ALL')}
+                className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              >
+                <option value="ALL">Todos os status</option>
+                <option value="TODO">{TASK_STATUS_LABELS.TODO}</option>
+                <option value="IN_PROGRESS">{TASK_STATUS_LABELS.IN_PROGRESS}</option>
+                <option value="DONE">{TASK_STATUS_LABELS.DONE}</option>
+              </select>
+
+              {/* Assignee Filter */}
+              <div className="inline-flex items-center">
+                <UserCheck className="mr-1.5 hidden h-3.5 w-3.5 text-slate-400 sm:inline" />
+                <select
+                  aria-label="Filtrar por responsável"
+                  value={selectedAssigneeId}
+                  onChange={(e) => setSelectedAssigneeId(e.target.value)}
+                  className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                >
+                  <option value="ALL">Todos os responsáveis</option>
+                  <option value="UNASSIGNED">Sem responsável</option>
+                  {collaborators.map((c) => (
+                    <option key={c.userId} value={c.userId}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Focus Filter Pill */}
+              <button
+                type="button"
+                onClick={() => setOnlyFocus(!onlyFocus)}
+                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-colors ${
+                  onlyFocus
+                    ? 'border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-700 dark:bg-amber-900/60 dark:text-amber-200'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                }`}
+              >
+                <Flame className={`h-3.5 w-3.5 ${onlyFocus ? 'fill-amber-500 text-amber-600 dark:text-amber-400' : 'text-slate-400'}`} />
+                <span>Em Foco</span>
+              </button>
+
+              {/* Tag / Etiqueta Filter Pills */}
+              {availableTags.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 pl-1">
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    <Tag className="h-3.5 w-3.5 text-indigo-500" />
+                    <span>Etiquetas:</span>
+                  </span>
+                  {availableTags.map((tag) => {
+                    const isTagActive = selectedTag === tag;
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => setSelectedTag(isTagActive ? 'ALL' : tag)}
+                        className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition-all ${
+                          isTagActive
+                            ? 'bg-indigo-600 text-white border-indigo-600 dark:bg-indigo-500'
+                            : getTagBadgeClasses(tag)
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-            <h3 className="text-base font-bold text-slate-800">
+
+            <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+              <span className="bb-tabular font-mono">
+                Exibindo <strong>{filteredTasks.length}</strong> de <strong>{tasks.length}</strong> tarefas
+              </span>
+              {activeFiltersCount > 0 && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 dark:bg-rose-950/60 dark:text-rose-300 dark:hover:bg-rose-900/60"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  <span>Limpar filtros ({activeFiltersCount})</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Board Columns View */}
+      {filteredTasks.length === 0 && (searchQuery.trim() || activeFiltersCount > 0) ? (
+        <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-6 py-16 text-center">
+          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Nenhuma tarefa encontrada</h3>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            Nenhuma tarefa corresponde aos filtros ou termo de busca selecionados.
+          </p>
+          {activeFiltersCount > 0 && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900"
+            >
+              <X className="h-3.5 w-3.5" />
+              <span>Limpar filtros</span>
+            </button>
+          )}
+        </div>
+      ) : boardView === 'STAGES' ? (
+        stages.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-6 py-16 text-center">
+            <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center mx-auto mb-3.5">
+              <Milestone className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
               Nenhuma etapa cadastrada neste projeto
             </h3>
-            <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-              Crie etapas (milestones) para organizar o fluxo de trabalho e atribuir tarefas a cada fase.
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+              Crie uma etapa para começar a organizar as tarefas deste projeto.
             </p>
             {onOpenCreateStage && (
               <button
                 type="button"
                 onClick={onOpenCreateStage}
-                className="mt-5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-md shadow-indigo-500/20 transition-all inline-flex items-center gap-1.5"
+                className="mt-6 inline-flex h-10 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
               >
                 <Plus className="w-4 h-4 stroke-[2.5]" />
                 <span>Criar Primeira Etapa</span>
@@ -118,16 +363,21 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {stages.map((stage) => {
-              const stageTasks = tasks.filter((t) => t.stageId === stage.id);
+          <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-2 2xl:grid-cols-3">
+            {visibleStages.map((stage) => {
+              const stageTasks = filteredTasks.filter((t) => t.stageId === stage.id);
               return (
                 <StageColumn
                   key={stage.id}
                   stage={stage}
+                  stages={stages}
                   tasks={stageTasks}
+                  collaborators={collaborators}
                   onMoveTask={onMoveTask}
+                  onMoveTaskToStage={onMoveTaskToStage}
+                  onUpdateTaskTags={onUpdateTaskTags}
                   onDeleteTask={onDeleteTask}
+                  onDeleteStage={onDeleteStage}
                   onAddSubtask={onAddSubtask}
                   onToggleSubtask={onToggleSubtask}
                   onDeleteSubtask={onDeleteSubtask}
@@ -138,30 +388,37 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
             {/* Quick Add Stage Column Card */}
             {onOpenCreateStage && (
-              <div
+              <button
+                type="button"
                 onClick={onOpenCreateStage}
-                className="flex flex-col items-center justify-center min-h-[300px] border-2 border-dashed border-slate-300 hover:border-indigo-400 rounded-2xl bg-slate-50/50 hover:bg-indigo-50/30 p-6 text-center cursor-pointer transition-all group"
+                className="group flex w-full self-start flex-row items-center justify-start gap-3 rounded-xl border border-dashed border-slate-300 bg-white/50 px-4 py-3 text-left transition-colors hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/50 dark:hover:border-slate-600 dark:hover:bg-slate-800/50 sm:flex-col sm:justify-center sm:gap-0 sm:p-6 sm:text-center"
               >
-                <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 group-hover:border-indigo-300 text-slate-400 group-hover:text-indigo-600 flex items-center justify-center transition-colors mb-2">
-                  <Plus className="w-5 h-5" />
+                <div className="mb-0 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors group-hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:group-hover:text-slate-100 sm:mb-2 sm:h-10 sm:w-10">
+                  <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
-                <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-700">
-                  Adicionar Nova Etapa
-                </p>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Clique para criar mais um marco no projeto
-                </p>
-              </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-slate-700 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-100">
+                    Adicionar Nova Etapa
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-400 sm:mt-1">
+                    Clique para criar mais um marco no projeto
+                  </p>
+                </div>
+              </button>
             )}
           </div>
         )
       ) : (
         /* 3-Column Traditional Status Grid (TODO, IN_PROGRESS, DONE) */
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
           <KanbanColumn
             status="TODO"
             tasks={todoTasks}
+            stages={stages}
+            collaborators={collaborators}
             onMoveTask={onMoveTask}
+            onMoveTaskToStage={onMoveTaskToStage}
+            onUpdateTaskTags={onUpdateTaskTags}
             onDeleteTask={onDeleteTask}
             onAddSubtask={onAddSubtask}
             onToggleSubtask={onToggleSubtask}
@@ -171,7 +428,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           <KanbanColumn
             status="IN_PROGRESS"
             tasks={inProgressTasks}
+            stages={stages}
+            collaborators={collaborators}
             onMoveTask={onMoveTask}
+            onMoveTaskToStage={onMoveTaskToStage}
+            onUpdateTaskTags={onUpdateTaskTags}
             onDeleteTask={onDeleteTask}
             onAddSubtask={onAddSubtask}
             onToggleSubtask={onToggleSubtask}
@@ -181,7 +442,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           <KanbanColumn
             status="DONE"
             tasks={doneTasks}
+            stages={stages}
+            collaborators={collaborators}
             onMoveTask={onMoveTask}
+            onMoveTaskToStage={onMoveTaskToStage}
+            onUpdateTaskTags={onUpdateTaskTags}
             onDeleteTask={onDeleteTask}
             onAddSubtask={onAddSubtask}
             onToggleSubtask={onToggleSubtask}
@@ -190,29 +455,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         </div>
       )}
 
-      {/* When total tasks is 0 */}
-      {tasks.length === 0 && (
-        <div className="text-center py-12 px-4 bg-white rounded-3xl border border-slate-200/80 shadow-card mt-6">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center mx-auto mb-3">
-            <Layers className="w-6 h-6" />
-          </div>
-          <h3 className="text-sm font-bold text-slate-800">
-            Nenhuma tarefa cadastrada no momento
-          </h3>
-          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-            {project
-              ? `Adicione tarefas às etapas do projeto "${project.title}".`
-              : 'Comece organizando sua rotina criando sua primeira tarefa.'}
-          </p>
-          <button
-            onClick={() => handleCreateTaskTrigger()}
-            className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all inline-flex items-center gap-1.5"
-          >
-            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>Criar Primeira Tarefa</span>
-          </button>
-        </div>
-      )}
     </div>
   );
 };

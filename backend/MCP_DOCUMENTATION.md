@@ -154,6 +154,23 @@ Cria uma nova etapa (coluna) no Kanban de um projeto.
   * `projectId` *(string, obrigatório)*: UUID do projeto.
   * `title` *(string, obrigatório)*: Nome da etapa (ex: Backlog, Fazendo).
 
+#### 3.1. `update_stage`
+Atualiza o título, status (`PLANNING`, `IN_PROGRESS`, `COMPLETED`) ou ordem de uma etapa.
+* **Argumentos:**
+  * `stageId` *(string, obrigatório)*: UUID da etapa.
+  * `title` *(string, opcional)*: Novo título.
+  * `status` *(string, opcional)*: `'PLANNING'`, `'IN_PROGRESS'` ou `'COMPLETED'`.
+  * `order` *(number, opcional)*: Nova ordem da etapa no projeto.
+
+#### 3.2. `delete_stage`
+Exclui uma etapa (coluna) de um projeto e as tarefas vinculadas a ela.
+* **Argumentos:**
+  * `stageId` *(string, obrigatório)*: UUID da etapa a ser excluída.
+
+#### 3.3. `list_project_collaborators` / `add_project_collaborator` / `remove_project_collaborator`
+Gerencia o proprietário (`OWNER`) e colaboradores (`COLLABORATOR`) do projeto.
+* **Argumentos:** `projectId` *(string, obrigatório)*, `email` ou `userId` *(string)*.
+
 #### 4. `read_project_context`
 Carrega a visão 360° do projeto para a IA: regras de negócio, repositório GitHub, configurações, etapas, tarefas, subtarefas, membros e diários de bordo.
 * **Argumentos:**
@@ -196,22 +213,26 @@ Cria uma nova tarefa associada a uma etapa (*Stage*).
   * `title` *(string, obrigatório)*: Título da tarefa.
   * `description` *(string, opcional)*: Descrição detalhada.
   * `status` *(string, opcional)*: `'TODO'`, `'IN_PROGRESS'` ou `'DONE'`. Padrão: `'TODO'`.
+  * `tags` *(string[], opcional)*: Lista de etiquetas/tags para classificar a tarefa (ex: `["Bug", "Frontend"]`).
+  * `assigneeId` *(string, opcional)*: UUID do colaborador/proprietário responsável pela tarefa.
 
 #### 9. `move_task` *(Alias: `update_task_status`)*
-Altera o status de uma tarefa no Kanban ou move-a para outra etapa.
+Altera o status de uma tarefa no Kanban e/ou move-a para outra etapa (`stageId`).
 * **Argumentos:**
   * `id` *(string, obrigatório)*: UUID da tarefa.
-  * `status` *(string, obrigatório)*: `'TODO'`, `'IN_PROGRESS'` ou `'DONE'`.
+  * `status` *(string, opcional)*: `'TODO'`, `'IN_PROGRESS'` ou `'DONE'`.
   * `stageId` *(string, opcional)*: UUID da nova etapa (se estiver movendo de etapa).
 
 #### 10. `update_task`
-Atualiza metadados de uma tarefa existente (título, descrição, status ou etapa).
+Atualiza metadados de uma tarefa existente (título, descrição, status, etapa, etiquetas ou responsável).
 * **Argumentos:**
   * `id` *(string, obrigatório)*: UUID da tarefa.
   * `title` *(string, opcional)*
   * `description` *(string, opcional)*
   * `status` *(string, opcional)*
   * `stageId` *(string, opcional)*
+  * `tags` *(string[], opcional)*: Lista atualizada de etiquetas/tags.
+  * `assigneeId` *(string, opcional)*: UUID do responsável (ou `""` para desatribuir).
 
 #### 11. `delete_task`
 Remove uma tarefa e deleta automaticamente todas as suas subtarefas em cascata.
@@ -229,6 +250,7 @@ Filtra e lista tarefas cadastradas.
   * `stageId` *(string, opcional)*: Filtra por etapa.
   * `projectId` *(string, opcional)*: Filtra por projeto.
   * `status` *(string, opcional)*: Filtra por `'TODO'`, `'IN_PROGRESS'` ou `'DONE'`.
+  * `tag` *(string, opcional)*: Filtra por etiqueta/tag (ex: `'Bug'`, `'Frontend'`).
   * `isSprintActive` *(boolean, opcional)*: Traz apenas tarefas na Sprint Semanal (`true`) ou fora dela (`false`).
 
 ---

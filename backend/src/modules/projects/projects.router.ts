@@ -12,6 +12,11 @@ projectsRouter.patch('/api/projects/:id/business-logic', controller.updateBusine
 projectsRouter.patch('/api/projects/:id/settings', controller.updateProjectSettings);
 projectsRouter.delete('/api/projects/:id', controller.deleteProject);
 
+// Collaborators
+projectsRouter.get('/api/projects/:id/collaborators', controller.getProjectCollaborators);
+projectsRouter.post('/api/projects/:id/collaborators', controller.addCollaborator);
+projectsRouter.delete('/api/projects/:id/collaborators/:userId', controller.removeCollaborator);
+
 // Sprints
 import { sprintController } from './controllers/sprint.controller.js';
 projectsRouter.get('/api/projects/:projectId/sprints', sprintController.getSprints);
@@ -22,6 +27,8 @@ projectsRouter.delete('/api/sprints/:sprintId', sprintController.deleteSprint);
 // Stages
 projectsRouter.get('/api/projects/:projectId/stages', controller.listStagesByProject);
 projectsRouter.post('/api/projects/:projectId/stages', controller.createStage);
+projectsRouter.patch('/api/projects/:projectId/stages/:id', controller.updateStage);
+projectsRouter.delete('/api/projects/:projectId/stages/:id', controller.deleteStage);
 projectsRouter.get('/api/stages/:id', controller.getStageById);
 projectsRouter.patch('/api/stages/:id', controller.updateStage);
 projectsRouter.delete('/api/stages/:id', controller.deleteStage);

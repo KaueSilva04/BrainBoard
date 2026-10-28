@@ -5,14 +5,14 @@ RUN apk add --no-cache openssl libc6-compat
 
 WORKDIR /app
 
-# Copy dependency definitions and prisma schema
+# Copy dependency definitions first so npm install stays cached when prisma/src changes
 COPY package*.json ./
-COPY prisma ./prisma/
 
 # Install all dependencies (including prisma CLI and tsx)
 RUN npm install
 
-# Generate Prisma Client
+# Copy prisma schema and generate Prisma Client
+COPY prisma ./prisma/
 RUN npx prisma generate
 
 COPY tsconfig.json ./

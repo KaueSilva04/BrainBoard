@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Calendar, Clock, MapPin, Loader2 } from 'lucide-react';
 import { appointmentsApi } from '../../services/api';
+import { useAccessibleModal } from '../../hooks/useAccessibleModal';
 
 export interface CreateAppointmentModalProps {
   isOpen: boolean;
@@ -22,6 +24,7 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const dialogRef = useAccessibleModal<HTMLDivElement>(isOpen, onClose);
 
   // Prefill dates on open
   useEffect(() => {
@@ -44,14 +47,6 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
       setEndTime(formatLocalIso(end));
     }
   }, [isOpen, defaultDate]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -98,23 +93,28 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/35 backdrop-blur-xs animate-in fade-in duration-200">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bb-modal-backdrop">
       <div
-        className="relative w-full max-w-lg bg-white border border-slate-100 rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-appointment-title"
+        tabIndex={-1}
+        className="relative flex max-h-[calc(100dvh-2rem)] min-h-0 w-full max-w-lg flex-col overflow-hidden bb-dialog-panel"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-100 bg-white">
+        <div className="flex shrink-0 items-center justify-between px-6 py-4.5 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-900">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
               <Calendar className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-extrabold text-slate-900 leading-tight">
+              <h2 id="create-appointment-title" className="text-base font-extrabold text-slate-900 dark:text-slate-100 leading-tight">
                 Novo Compromisso
               </h2>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-slate-400 dark:text-slate-400">
                 Agende reuniões, eventos ou sessões de estudo
               </p>
             </div>
@@ -122,24 +122,25 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
           <button
             onClick={onClose}
             aria-label="Fechar"
-            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-xl hover:bg-slate-100 transition-colors"
+            className="text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 sm:p-6">
           {errorMessage && (
-            <div className="p-3 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-xl font-medium">
+            <div className="p-3 text-xs text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800/70 rounded-xl font-medium">
               {errorMessage}
             </div>
           )}
 
           {/* Title Field */}
           <div className="space-y-1.5">
-            <label htmlFor="apt-title" className="block text-xs font-bold text-slate-700">
-              Título do Compromisso <span className="text-rose-500">*</span>
+            <label htmlFor="apt-title" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              Título do Compromisso <span className="text-rose-500 dark:text-rose-400">*</span>
             </label>
             <input
               id="apt-title"
@@ -148,17 +149,17 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ex: Daily Scrum, Alinhamento de TCC, Reunião com Cliente..."
-              autoFocus
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
+              data-modal-autofocus
+              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
             />
           </div>
 
           {/* Time Fields */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label htmlFor="apt-start" className="block text-xs font-bold text-slate-700 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5 text-indigo-500" />
-                <span>Início <span className="text-rose-500">*</span></span>
+              <label htmlFor="apt-start" className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
+                <span>Início <span className="text-rose-500 dark:text-rose-400">*</span></span>
               </label>
               <input
                 id="apt-start"
@@ -166,14 +167,14 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
                 type="datetime-local"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label htmlFor="apt-end" className="block text-xs font-bold text-slate-700 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5 text-indigo-500" />
-                <span>Término <span className="text-rose-500">*</span></span>
+              <label htmlFor="apt-end" className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
+                <span>Término <span className="text-rose-500 dark:text-rose-400">*</span></span>
               </label>
               <input
                 id="apt-end"
@@ -181,16 +182,16 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
                 type="datetime-local"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
               />
             </div>
           </div>
 
           {/* Location or Link */}
           <div className="space-y-1.5">
-            <label htmlFor="apt-location" className="block text-xs font-bold text-slate-700 flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5 text-slate-400" />
-              <span>Local ou Link de Reunião <span className="text-slate-400 font-normal">(Opcional)</span></span>
+            <label htmlFor="apt-location" className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5 text-slate-400 dark:text-slate-400" />
+              <span>Local ou Link de Reunião <span className="text-slate-400 dark:text-slate-400 font-normal">(Opcional)</span></span>
             </label>
             <input
               id="apt-location"
@@ -199,14 +200,14 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
               value={locationOrLink}
               onChange={(e) => setLocationOrLink(e.target.value)}
               placeholder="Ex: Google Meet, Zoom, Sala 302, Laboratório B..."
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
+              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
             />
           </div>
 
           {/* Description Field */}
           <div className="space-y-1.5">
-            <label htmlFor="apt-desc" className="block text-xs font-bold text-slate-700">
-              Descrição / Notas <span className="text-slate-400 font-normal">(Opcional)</span>
+            <label htmlFor="apt-desc" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              Descrição / Notas <span className="text-slate-400 dark:text-slate-400 font-normal">(Opcional)</span>
             </label>
             <textarea
               id="apt-desc"
@@ -215,23 +216,24 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Pauta da reunião, links de documentos, preparação prévia..."
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all resize-none"
+              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all resize-none"
             />
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+          </div>
+          <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900 sm:px-6">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors"
+              className="inline-flex min-h-11 items-center justify-center px-4 py-2.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !title.trim() || !startTime || !endTime}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-semibold text-white border border-indigo-500/20 transition-all hover:bg-indigo-700 disabled:opacity-50"
             >
               {isSubmitting ? (
                 <>
@@ -245,6 +247,7 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };

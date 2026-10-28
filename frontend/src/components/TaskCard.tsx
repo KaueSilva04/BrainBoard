@@ -11,16 +11,27 @@ import {
   CheckSquare,
   Flame,
   Calendar,
+  User,
+  Check,
+  GripVertical,
+  Milestone,
+  Tag,
+  X,
 } from 'lucide-react';
-import type { Task, TaskStatus } from '../types';
-import { TASK_STATUS_LABELS } from '../types';
+import type { Task, TaskStatus, Stage, ProjectCollaborator, AuthUser } from '../types';
+import { TASK_STATUS_LABELS, PRESET_TASK_TAGS, getTagBadgeClasses, getTaskTags } from '../types';
 import { SubtaskItem } from './SubtaskItem';
 import { tasksApi } from '../services/api';
+import { getInitials } from './collaborators/AvatarStack';
 
 export interface TaskCardProps {
   task: Task;
   stageName?: string;
+  stages?: Stage[];
+  collaborators?: ProjectCollaborator[];
   onMoveTask: (id: string, status: TaskStatus) => Promise<void>;
+  onMoveTaskToStage?: (taskId: string, targetStageId: string) => Promise<void>;
+  onUpdateTaskTags?: (taskId: string, tags: string[]) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
   onAddSubtask: (taskId: string, title: string) => Promise<void>;
   onToggleSubtask: (id: string, isDone: boolean) => Promise<void>;
@@ -31,7 +42,11 @@ export interface TaskCardProps {
 export const TaskCard: React.FC<TaskCardProps> = ({
   task,
   stageName,
+  stages,
+  collaborators,
   onMoveTask,
+  onMoveTaskToStage,
+  onUpdateTaskTags,
   onDeleteTask,
   onAddSubtask,
   onToggleSubtask,
@@ -45,6 +60,73 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const [showSubtaskForm, setShowSubtaskForm] = useState(false);
   const [isSprintActive, setIsSprintActive] = useState<boolean>(Boolean(task.isSprintActive));
   const [isTogglingSprint, setIsTogglingSprint] = useState(false);
+  const [assignee, setAssignee] = useState<AuthUser | null | undefined>(task.assignee);
+  const [isAssigneeOpen, setIsAssigneeOpen] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [isStageMenuOpen, setIsStageMenuOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [tags, setTags] = useState<string[]>(() => getTaskTags(task));
+  const [isTagMenuOpen, setIsTagMenuOpen] = useState(false);
+  const [newTagInput, setNewTagInput] = useState('');
+  const [isSavingTags, setIsSavingTags] = useState(false);
+
+  const handleSaveTags = async (nextTags: string[]) => {
+    const cleanTags = Array.from(new Set(nextTags.map((t) => t.trim().replace(/^#/, '')).filter(Boolean)));
+    const prevTags = tags;
+    setTags(cleanTags);
+    setIsSavingTags(true);
+    try {
+      if (onUpdateTaskTags) {
+        await onUpdateTaskTags(task.id, cleanTags);
+      } else {
+        await tasksApi.update(task.id, { tags: cleanTags });
+      }
+    } catch (err) {
+      console.error('Failed to update task tags:', err);
+      setTags(prevTags);
+    } finally {
+      setIsSavingTags(false);
+    }
+  };
+
+  const handleToggleTag = (tag: string) => {
+    const clean = tag.trim().replace(/^#/, '');
+    if (!clean) return;
+    const next = tags.includes(clean) ? tags.filter((t) => t !== clean) : [...tags, clean];
+    void handleSaveTags(next);
+  };
+
+  const handleAddCustomTag = () => {
+    const clean = newTagInput.trim().replace(/^#/, '');
+    if (!clean) return;
+    setNewTagInput('');
+    if (!tags.includes(clean)) {
+      void handleSaveTags([...tags, clean]);
+    }
+  };
+
+  const handleAssign = async (collab: ProjectCollaborator | null) => {
+    setIsAssigning(true);
+    try {
+      const assigneeId = collab ? collab.userId : null;
+      await tasksApi.update(task.id, { assigneeId });
+      setAssignee(
+        collab
+          ? {
+              id: collab.userId,
+              name: collab.name,
+              email: collab.email,
+              avatarColor: collab.avatarColor,
+            }
+          : null
+      );
+      setIsAssigneeOpen(false);
+    } catch (err) {
+      console.error('Failed to update assignee:', err);
+    } finally {
+      setIsAssigning(false);
+    }
+  };
 
   const statusConfig: Record<
     TaskStatus,
@@ -55,18 +137,18 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     }
   > = {
     TODO: {
-      iconBox: 'bg-amber-50 text-amber-600 border border-amber-200/80',
-      badge: 'bg-amber-100/70 text-amber-800 border border-amber-200/80',
+      iconBox: 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border border-amber-200/80 dark:border-amber-800/70',
+      badge: 'bg-amber-100/70 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/70',
       icon: <Clock className="w-4 h-4" />,
     },
     IN_PROGRESS: {
-      iconBox: 'bg-indigo-50 text-indigo-600 border border-indigo-200/80',
-      badge: 'bg-indigo-100/70 text-indigo-800 border border-indigo-200/80',
+      iconBox: 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/70',
+      badge: 'bg-indigo-100/70 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/70',
       icon: <PlayCircle className="w-4 h-4" />,
     },
     DONE: {
-      iconBox: 'bg-emerald-50 text-emerald-600 border border-emerald-200/80',
-      badge: 'bg-emerald-100/70 text-emerald-800 border border-emerald-200/80',
+      iconBox: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/70',
+      badge: 'bg-emerald-100/70 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/70',
       icon: <CheckCircle2 className="w-4 h-4" />,
     },
   };
@@ -164,67 +246,137 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   }
 
   const currentStatusConfig = statusConfig[task.status] || statusConfig.TODO;
+  const resolvedStageName =
+    stageName || stages?.find((s) => s.id === task.stageId)?.title || task.stage?.title;
+
+  const handleMoveStage = async (targetStageId: string) => {
+    if (!onMoveTaskToStage || targetStageId === task.stageId || isMoving) {
+      setIsStageMenuOpen(false);
+      return;
+    }
+    setIsMoving(true);
+    setIsStageMenuOpen(false);
+    try {
+      await onMoveTaskToStage(task.id, targetStageId);
+    } finally {
+      setIsMoving(false);
+    }
+  };
 
   return (
-    <div className="group relative bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-card hover:shadow-card-hover hover:border-indigo-200/90 transition-all duration-200 space-y-4">
+    <div
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', task.id);
+        e.dataTransfer.setData('application/x-brainboard-task', JSON.stringify({ id: task.id, stageId: task.stageId, status: task.status }));
+        e.dataTransfer.effectAllowed = 'move';
+        setIsDragging(true);
+      }}
+      onDragEnd={() => setIsDragging(false)}
+      className={`bb-panel bb-card-motion group relative space-y-4 p-4 cursor-grab active:cursor-grabbing transition-all ${
+        isDragging ? 'opacity-50 scale-[0.98] ring-2 ring-indigo-500/50' : ''
+      }`}
+    >
       {/* Top Header: Status Icon Box + Badge & Actions */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          {/* Status Icon Box */}
-          <div
-            className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${currentStatusConfig.iconBox}`}
-          >
-            {currentStatusConfig.icon}
+          {/* Drag Grip + Status Icon Box */}
+          <div className="flex items-center gap-1">
+            <GripVertical
+              className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-400 dark:group-hover:text-slate-400 shrink-0 transition-colors"
+              aria-hidden="true"
+            />
+            <div
+              className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border border-slate-200/60 dark:border-slate-700/60 ${currentStatusConfig.iconBox}`}
+            >
+              {currentStatusConfig.icon}
+            </div>
           </div>
           <div>
             <div className="flex items-center gap-1.5 flex-wrap">
               <span
-                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${currentStatusConfig.badge}`}
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${currentStatusConfig.badge}`}
               >
                 {TASK_STATUS_LABELS[task.status]}
               </span>
-              {stageName && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-                  {stageName}
-                </span>
+              {resolvedStageName && (
+                <div className="relative">
+                  {stages && stages.length > 1 && onMoveTaskToStage ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsStageMenuOpen(!isStageMenuOpen)}
+                      title="Clique para mover para outra etapa"
+                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:border-indigo-300 hover:text-indigo-600 dark:hover:border-indigo-700 dark:hover:text-indigo-400 transition-colors"
+                    >
+                      <Milestone className="w-3 h-3" />
+                      <span>{resolvedStageName}</span>
+                    </button>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                      {resolvedStageName}
+                    </span>
+                  )}
+
+                  {isStageMenuOpen && stages && stages.length > 1 && (
+                    <div className="absolute left-0 top-full z-30 mt-1 w-48 rounded-lg border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-800">
+                      <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        Mover para etapa
+                      </div>
+                      {stages.map((st) => {
+                        const isCurrent = st.id === task.stageId;
+                        return (
+                          <button
+                            key={st.id}
+                            type="button"
+                            onClick={() => void handleMoveStage(st.id)}
+                            className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60"
+                          >
+                            <span className="truncate text-left">{st.title}</span>
+                            {isCurrent && <Check className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               )}
               {/* Quick Sprint Active Toggle Badge */}
               <button
                 type="button"
                 onClick={handleToggleSprint}
                 disabled={isTogglingSprint}
-                title={isSprintActive ? 'Remover da Sprint Semanal' : 'Adicionar à Sprint Semanal'}
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold transition-all ${
+                title={isSprintActive ? 'Remover do foco' : 'Adicionar ao foco'}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${
                   isSprintActive
-                    ? 'bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200 shadow-2xs'
-                    : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50 border border-transparent hover:border-amber-200'
+                    ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/70 hover:bg-amber-200 dark:hover:bg-amber-900/50'
+                    : 'text-slate-400 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/50 border border-transparent hover:border-amber-200 dark:hover:border-amber-800/70'
                 }`}
               >
                 {isTogglingSprint ? (
                   <Loader2 className="w-3 h-3 animate-spin" />
                 ) : (
-                  <Flame className={`w-3 h-3 ${isSprintActive ? 'text-amber-600 fill-amber-500' : ''}`} />
+                  <Flame className={`w-3 h-3 ${isSprintActive ? 'text-amber-600 dark:text-amber-400 fill-amber-500' : ''}`} />
                 )}
-                <span>{isSprintActive ? 'Sprint' : '+Sprint'}</span>
+                <span>{isSprintActive ? 'Foco' : '+Foco'}</span>
               </button>
             </div>
-            <div className="flex items-center gap-1.5 text-[11px] mt-0.5 font-medium">
+            <div className="mt-1 flex items-center gap-1.5 text-xs font-medium">
               {task.dueDate ? (
                 <span
                   className={`inline-flex items-center gap-1 ${
                     isOverdue
-                      ? 'text-rose-600 font-bold'
+                      ? 'text-rose-600 dark:text-rose-400 font-bold'
                       : task.status === 'DONE'
-                      ? 'text-slate-400'
-                      : 'text-indigo-600 font-semibold'
+                      ? 'text-slate-400 dark:text-slate-400'
+                      : 'text-indigo-600 dark:text-indigo-400 font-semibold'
                   }`}
                 >
                   <Calendar className="w-3 h-3" />
                   <span>{dateDisplay}</span>
                 </span>
               ) : (
-                <span className="text-slate-400 flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-slate-400" />
+                <span className="text-slate-400 dark:text-slate-400 flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-slate-400 dark:text-slate-400" />
                   <span>{dateDisplay}</span>
                 </span>
               )}
@@ -237,10 +389,10 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           onClick={handleDelete}
           disabled={isDeleting}
           aria-label="Excluir tarefa"
-          className="text-slate-400 hover:text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition-colors opacity-70 group-hover:opacity-100"
+          className="rounded-lg p-1.5 text-slate-400 dark:text-slate-400 transition-colors hover:bg-rose-50 dark:hover:bg-rose-950/50 hover:text-rose-500 dark:hover:text-rose-400"
         >
           {isDeleting ? (
-            <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+            <Loader2 className="w-4 h-4 animate-spin text-slate-400 dark:text-slate-400" />
           ) : (
             <Trash2 className="w-4 h-4" />
           )}
@@ -250,28 +402,198 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       {/* Task Title & Description */}
       <div>
         <h4
-          className={`text-sm font-bold leading-snug tracking-tight transition-colors ${
+          className={`text-base font-semibold leading-snug tracking-tight transition-colors ${
             task.status === 'DONE'
-              ? 'text-slate-400 line-through font-normal'
-              : 'text-slate-900 group-hover:text-indigo-600'
+              ? 'text-slate-400 dark:text-slate-400 line-through font-normal'
+              : 'text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
           }`}
         >
           {task.title}
         </h4>
         {task.description && (
-          <p className="mt-1 text-xs text-slate-500 line-clamp-2 leading-relaxed font-normal">
+          <p className="mt-1 line-clamp-2 text-sm font-normal leading-relaxed text-slate-500 dark:text-slate-400">
             {task.description}
           </p>
         )}
       </div>
 
+      {/* Assignee & Tags row */}
+      <div className="relative flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* Existing Tags Chips */}
+          {tags.map((tag) => (
+            <span
+              key={tag}
+              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getTagBadgeClasses(
+                tag
+              )}`}
+            >
+              <span>{tag}</span>
+              <button
+                type="button"
+                onClick={() => handleToggleTag(tag)}
+                title={`Remover etiqueta ${tag}`}
+                className="opacity-70 hover:opacity-100"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </span>
+          ))}
+
+          {/* Add / Manage Tags Popover Trigger */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsTagMenuOpen(!isTagMenuOpen)}
+              disabled={isSavingTags}
+              title="Gerenciar etiquetas da tarefa"
+              className="inline-flex items-center gap-1 rounded-full border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-2 py-0.5 text-[10px] font-semibold text-slate-500 hover:border-indigo-400 hover:text-indigo-600 dark:text-slate-400 dark:hover:border-indigo-600 dark:hover:text-indigo-400 transition-colors"
+            >
+              <Tag className="h-2.5 w-2.5" />
+              <span>{tags.length === 0 ? '+ Etiqueta' : '+'}</span>
+            </button>
+
+            {isTagMenuOpen && (
+              <div className="absolute left-0 top-full z-30 mt-1 w-56 rounded-xl border border-slate-200 bg-white p-2.5 shadow-lg dark:border-slate-700 dark:bg-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Etiquetas
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsTagMenuOpen(false)}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {Array.from(new Set([...PRESET_TASK_TAGS, ...tags])).map((preset) => {
+                    const isActive = tags.includes(preset);
+                    return (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => handleToggleTag(preset)}
+                        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-all ${
+                          isActive
+                            ? `${getTagBadgeClasses(preset)} ring-1 ring-indigo-500/40`
+                            : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'
+                        }`}
+                      >
+                        <span>{preset}</span>
+                        {isActive && <Check className="h-2.5 w-2.5" />}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-1 pt-1 border-t border-slate-100 dark:border-slate-700">
+                  <input
+                    type="text"
+                    value={newTagInput}
+                    onChange={(e) => setNewTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCustomTag();
+                      }
+                    }}
+                    placeholder="Nova etiqueta..."
+                    className="flex-1 min-w-0 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-2 py-1 text-[11px] text-slate-800 dark:text-slate-200 focus:border-indigo-500 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCustomTag}
+                    disabled={!newTagInput.trim()}
+                    className="rounded-lg bg-slate-900 px-2 py-1 text-[10px] font-semibold text-white disabled:opacity-40 dark:bg-slate-100 dark:text-slate-900"
+                  >
+                    OK
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setIsAssigneeOpen(!isAssigneeOpen)}
+            aria-label="Alterar responsável"
+            disabled={isAssigning}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
+          >
+            {isAssigning ? (
+              <Loader2 className="h-3 w-3 animate-spin text-slate-400" />
+            ) : assignee ? (
+              <>
+                <span
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[8px] font-bold text-white"
+                  style={{ backgroundColor: assignee.avatarColor || '#334155' }}
+                >
+                  {getInitials(assignee.name)}
+                </span>
+                <span className="truncate max-w-[120px]">{assignee.name}</span>
+              </>
+            ) : (
+              <>
+                <User className="h-3 w-3 text-slate-400" />
+                <span className="text-slate-400">+ Atribuir</span>
+              </>
+            )}
+          </button>
+
+          {isAssigneeOpen && (
+            <div className="absolute left-0 top-full z-30 mt-1 w-52 rounded-lg border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-800">
+              <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Responsável
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleAssign(null)}
+                className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700/60"
+              >
+                <span>Não atribuído</span>
+                {!assignee && <Check className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />}
+              </button>
+              {collaborators && collaborators.length > 0 && (
+                <div className="mt-1 border-t border-slate-100 dark:border-slate-700 pt-1">
+                  {collaborators.map((c) => {
+                    const isSelected = assignee?.id === c.userId;
+                    return (
+                      <button
+                        key={c.userId}
+                        type="button"
+                        onClick={() => void handleAssign(c)}
+                        className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60"
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white"
+                            style={{ backgroundColor: c.avatarColor || '#334155' }}
+                          >
+                            {getInitials(c.name)}
+                          </span>
+                          <span className="truncate text-left">{c.name}</span>
+                        </div>
+                        {isSelected && <Check className="h-3.5 w-3.5 text-slate-900 dark:text-white shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Subtasks & Progress Bar Section */}
-      <div className="space-y-2 pt-2 border-t border-slate-100">
+      <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-700">
         <div className="flex items-center justify-between text-xs font-medium">
-          <span className="flex items-center gap-1.5 text-slate-600">
-            <CheckSquare className="w-3.5 h-3.5 text-slate-400" />
+          <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+            <CheckSquare className="w-3.5 h-3.5 text-slate-400 dark:text-slate-400" />
             <span>Subtarefas</span>
-            <span className="font-bold text-slate-800">
+            <span className="bb-tabular font-mono font-bold text-slate-800 dark:text-slate-200">
               {totalSubtasks > 0 && `(${completedSubtasks}/${totalSubtasks})`}
             </span>
           </span>
@@ -279,20 +601,20 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           <button
             type="button"
             onClick={() => setShowSubtaskForm(!showSubtaskForm)}
-            className="text-indigo-600 hover:text-indigo-700 transition-colors flex items-center gap-1 font-semibold text-xs"
+            className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors flex items-center gap-1 font-semibold text-xs"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Adicionar</span>
           </button>
         </div>
 
-        {/* Colorful Gradient Progress Bar */}
-        <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden p-0.5">
+        {/* Subtask Progress Bar */}
+        <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden p-0.5">
           <div
-            className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r ${
+            className={`h-full rounded-full transition-all duration-500 ${
               progressPercent === 100
-                ? 'from-emerald-400 to-teal-500'
-                : 'from-indigo-500 via-purple-500 to-pink-500'
+                ? 'bg-emerald-500'
+                : 'bg-indigo-500'
             }`}
             style={{ width: `${totalSubtasks > 0 ? progressPercent : 0}%` }}
           />
@@ -321,12 +643,12 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               onChange={(e) => setSubtaskTitle(e.target.value)}
               placeholder="Nova subtarefa..."
               autoFocus
-              className="flex-1 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-xl px-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500/20"
+              className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 rounded-xl px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500/20"
             />
             <button
               type="submit"
               disabled={isAddingSubtask || !subtaskTitle.trim()}
-              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold rounded-xl transition-colors flex items-center gap-1 shadow-xs"
+              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
             >
               {isAddingSubtask ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Salvar'}
             </button>
@@ -336,7 +658,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 setShowSubtaskForm(false);
                 setSubtaskTitle('');
               }}
-              className="px-2 py-1.5 text-slate-400 hover:text-slate-600 text-xs rounded-lg hover:bg-slate-100"
+              className="px-2 py-1.5 text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xs rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               ✕
             </button>
@@ -345,13 +667,13 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       </div>
 
       {/* Movement Action Buttons */}
-      <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+      <div className="pt-2 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between gap-2">
         {task.status === 'TODO' && (
           <button
             type="button"
             onClick={() => handleMove('IN_PROGRESS')}
             disabled={isMoving}
-            className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition-all shadow-xs"
+            className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/70 transition-colors"
           >
             {isMoving ? (
               <Loader2 className="w-3 h-3 animate-spin" />
@@ -370,7 +692,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               type="button"
               onClick={() => handleMove('TODO')}
               disabled={isMoving}
-              className="flex-1 flex items-center justify-center gap-1 py-2 px-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-all"
+              className="flex-1 flex items-center justify-center gap-1 py-2 px-2.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Voltar</span>
@@ -379,7 +701,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               type="button"
               onClick={() => handleMove('DONE')}
               disabled={isMoving}
-              className="flex-1 flex items-center justify-center gap-1 py-2 px-2.5 rounded-xl text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-all shadow-xs"
+              className="flex-1 flex items-center justify-center gap-1 py-2 px-2.5 rounded-xl text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/70 transition-colors"
             >
               <span>Concluir</span>
               <CheckCircle2 className="w-3.5 h-3.5" />
@@ -392,7 +714,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             type="button"
             onClick={() => handleMove('IN_PROGRESS')}
             disabled={isMoving}
-            className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-all"
+            className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-all"
           >
             {isMoving ? (
               <Loader2 className="w-3 h-3 animate-spin" />

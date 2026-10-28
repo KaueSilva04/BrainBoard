@@ -69,9 +69,9 @@ export async function handleAcademicTools(name: string, args: any) {
     
     const subject = await academicService.createSubject({
       title,
-      description: args?.description ? String(args.description) : undefined,
-      professor: args?.professor ? String(args.professor) : undefined,
-      colorCode: args?.colorCode ? String(args.colorCode) : undefined,
+      ...(args?.description ? { description: String(args.description) } : {}),
+      ...(args?.professor ? { professor: String(args.professor) } : {}),
+      ...(args?.colorCode ? { colorCode: String(args.colorCode) } : {}),
     });
     
     return {
@@ -89,9 +89,9 @@ export async function handleAcademicTools(name: string, args: any) {
       subjectId,
       title,
       type: type as any,
-      description: args?.description ? String(args.description) : undefined,
-      dueDate: args?.dueDate ? String(args.dueDate) : undefined,
-      status: args?.status ? (args.status as any) : undefined,
+      ...(args?.description ? { description: String(args.description) } : {}),
+      ...(args?.dueDate ? { dueDate: String(args.dueDate) } : {}),
+      ...(args?.status ? { status: args.status as any } : {}),
     });
 
     return {

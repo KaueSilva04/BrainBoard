@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Loader2, Milestone, Clock, PlayCircle, CheckCircle2 } from 'lucide-react';
 import type { CreateStageInput, StageStatus } from '../types';
 import { STAGE_STATUS_LABELS } from '../types';
+import { useAccessibleModal } from '../hooks/useAccessibleModal';
 
 export interface CreateStageModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export const CreateStageModal: React.FC<CreateStageModalProps> = ({
   const [order, setOrder] = useState<number>(nextOrder);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const dialogRef = useAccessibleModal<HTMLDivElement>(isOpen, onClose);
 
   useEffect(() => {
     if (isOpen) {
@@ -32,14 +34,6 @@ export const CreateStageModal: React.FC<CreateStageModalProps> = ({
       setErrorMessage('');
     }
   }, [isOpen, nextOrder]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -81,44 +75,49 @@ export const CreateStageModal: React.FC<CreateStageModalProps> = ({
       label: STAGE_STATUS_LABELS.PLANNING,
       icon: <Clock className="w-4 h-4" />,
       activeBorder: 'border-amber-400 ring-2 ring-amber-400/20',
-      activeBg: 'bg-amber-50/80',
-      textColor: 'text-amber-700',
+      activeBg: 'bg-amber-50/80 dark:bg-amber-950/50',
+      textColor: 'text-amber-700 dark:text-amber-300',
     },
     {
       id: 'IN_PROGRESS',
       label: STAGE_STATUS_LABELS.IN_PROGRESS,
       icon: <PlayCircle className="w-4 h-4" />,
       activeBorder: 'border-indigo-400 ring-2 ring-indigo-400/20',
-      activeBg: 'bg-indigo-50/80',
-      textColor: 'text-indigo-700',
+      activeBg: 'bg-indigo-50/80 dark:bg-indigo-950/50',
+      textColor: 'text-indigo-700 dark:text-indigo-300',
     },
     {
       id: 'COMPLETED',
       label: STAGE_STATUS_LABELS.COMPLETED,
       icon: <CheckCircle2 className="w-4 h-4" />,
       activeBorder: 'border-emerald-400 ring-2 ring-emerald-400/20',
-      activeBg: 'bg-emerald-50/80',
-      textColor: 'text-emerald-700',
+      activeBg: 'bg-emerald-50/80 dark:bg-emerald-950/50',
+      textColor: 'text-emerald-700 dark:text-emerald-300',
     },
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/35 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bb-modal-backdrop">
       <div
-        className="relative w-full max-w-md bg-white border border-slate-100 rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-stage-title"
+        tabIndex={-1}
+        className="relative w-full max-w-md bb-dialog-panel overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-100 bg-white">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+        <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center">
               <Milestone className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-extrabold text-slate-900 leading-tight">
+              <h2 id="create-stage-title" className="text-base font-extrabold text-slate-900 dark:text-slate-100 leading-tight">
                 Nova Etapa (Milestone)
               </h2>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-slate-400 dark:text-slate-400">
                 Adicione uma nova etapa/coluna ao quadro do projeto
               </p>
             </div>
@@ -126,7 +125,7 @@ export const CreateStageModal: React.FC<CreateStageModalProps> = ({
           <button
             onClick={onClose}
             aria-label="Fechar"
-            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-xl hover:bg-slate-100 transition-colors"
+            className="text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -135,15 +134,15 @@ export const CreateStageModal: React.FC<CreateStageModalProps> = ({
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {errorMessage && (
-            <div className="p-3 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-xl font-medium">
+            <div className="p-3 text-xs text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800/70 rounded-xl font-medium">
               {errorMessage}
             </div>
           )}
 
           {/* Title Field */}
           <div className="space-y-1.5">
-            <label htmlFor="stage-title" className="block text-xs font-bold text-slate-700">
-              Título da Etapa <span className="text-rose-500">*</span>
+            <label htmlFor="stage-title" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              Título da Etapa <span className="text-rose-500 dark:text-rose-400">*</span>
             </label>
             <input
               id="stage-title"
@@ -152,14 +151,14 @@ export const CreateStageModal: React.FC<CreateStageModalProps> = ({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ex: Fase 1: Arquitetura e Modelagem..."
-              autoFocus
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
+              data-modal-autofocus
+              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
             />
           </div>
 
           {/* Status Selector */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Status Inicial
             </label>
             <div className="grid grid-cols-3 gap-2.5">
@@ -179,7 +178,7 @@ export const CreateStageModal: React.FC<CreateStageModalProps> = ({
                       className={`flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl border text-xs font-semibold transition-all ${
                         isChecked
                           ? `${opt.activeBorder} ${opt.activeBg} ${opt.textColor} shadow-xs`
-                          : 'border-slate-200/80 bg-slate-50/70 text-slate-600 hover:bg-slate-100 hover:border-slate-300'
+                          : 'border-slate-200/80 dark:border-slate-700/80 bg-slate-50/70 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
                       }`}
                     >
                       {opt.icon}
@@ -193,7 +192,7 @@ export const CreateStageModal: React.FC<CreateStageModalProps> = ({
 
           {/* Order Field */}
           <div className="space-y-1.5">
-            <label htmlFor="stage-order" className="block text-xs font-bold text-slate-700">
+            <label htmlFor="stage-order" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Ordem de Exibição
             </label>
             <input
@@ -203,23 +202,23 @@ export const CreateStageModal: React.FC<CreateStageModalProps> = ({
               min={0}
               value={order}
               onChange={(e) => setOrder(Number(e.target.value))}
-              className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
+              className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-800 dark:text-slate-200 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
             />
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors"
+              className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !title.trim()}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2"
+              className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white disabled:opacity-50 text-xs font-semibold rounded-lg transition-colors flex items-center gap-2"
             >
               {isSubmitting ? (
                 <>

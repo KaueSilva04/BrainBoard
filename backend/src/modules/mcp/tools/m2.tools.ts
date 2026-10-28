@@ -1,5 +1,6 @@
 import { appointmentService } from '../../calendar/appointment.service.js';
 import { taskService } from '../../projects/services/task.service.js';
+import { collaboratorService } from '../../projects/services/collaborator.service.js';
 import { prisma } from '../../../prisma.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
@@ -55,7 +56,7 @@ export const m2ToolSchemas: Tool[] = [
   },
 ];
 
-export async function handleM2Tools(name: string, args: any) {
+export async function handleM2Tools(name: string, args: any, userId?: string) {
   if (name === 'create_appointment') {
     const title = String(args?.title ?? '').trim();
     const startTimeStr = String(args?.startTime ?? '').trim();
@@ -94,11 +95,30 @@ export async function handleM2Tools(name: string, args: any) {
     const now = new Date();
     const futureDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
 
+    if (projectId && userId) {
+      const hasAccess = await collaboratorService.isMemberOrOwner(projectId, userId);
+      if (!hasAccess) {
+        throw new Error('Acesso negado: você não é proprietário nem colaborador deste projeto');
+      }
+    }
+
     const tasks = await prisma.task.findMany({
       where: {
         dueDate: { gte: now, lte: futureDate },
         ...(includeCompleted ? {} : { status: { not: 'DONE' } }),
-        ...(projectId ? { stage: { projectId } } : {}),
+        stage: {
+          ...(projectId ? { projectId } : {}),
+          ...(userId
+            ? {
+                project: {
+                  OR: [
+                    { ownerId: userId },
+                    { collaborators: { some: { userId } } },
+                  ],
+                },
+              }
+            : {}),
+        },
       },
       include: { stage: { include: { project: true } } },
       orderBy: { dueDate: 'asc' },
@@ -142,6 +162,18 @@ export async function handleM2Tools(name: string, args: any) {
   if (name === 'add_to_sprint') {
     const taskId = String(args?.taskId ?? '').trim();
     if (!taskId) throw new Error('taskId é obrigatório');
+
+    if (userId) {
+      const existingTask = await prisma.task.findUnique({
+        where: { id: taskId },
+        select: { stage: { select: { projectId: true } } },
+      });
+      if (!existingTask) throw new Error('Tarefa não encontrada');
+      const hasAccess = await collaboratorService.isMemberOrOwner(existingTask.stage.projectId, userId);
+      if (!hasAccess) {
+        throw new Error('Acesso negado: você não é proprietário nem colaborador deste projeto');
+      }
+    }
 
     const isSprintActive =
       args?.isSprintActive !== undefined

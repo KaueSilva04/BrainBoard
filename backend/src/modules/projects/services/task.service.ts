@@ -2,6 +2,8 @@ import { Status } from '@prisma/client';
 import type { Task } from '@prisma/client';
 import { prisma } from '../../../prisma.js';
 import { ValidationError, NotFoundError } from '../../shared/errors.js';
+import { validateTextEncoding } from '../../shared/text-encoding.js';
+import { collaboratorService } from './collaborator.service.js';
 import type {
   CreateTaskInput,
   UpdateTaskInput,
@@ -10,6 +12,13 @@ import type {
 } from '../projects.types.js';
 
 export const VALID_STATUSES: Status[] = ['TODO', 'IN_PROGRESS', 'DONE'];
+
+const USER_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  avatarColor: true,
+};
 
 export class TaskService {
   async listTasks(filters?: TaskFilterOptions): Promise<TaskWithSubtasks[]> {
@@ -20,7 +29,7 @@ export class TaskService {
     }
 
     if (filters?.projectId) {
-      where.stage = { projectId: filters.projectId };
+      where.stage = { ...where.stage, projectId: filters.projectId };
     }
 
     if (filters?.status) {
@@ -40,9 +49,29 @@ export class TaskService {
       where.dueDate = { not: null };
     }
 
+    if (filters?.tag && filters.tag.trim()) {
+      where.tags = { has: filters.tag.trim().replace(/^#/, '') };
+    }
+
+    if (filters?.userId && !filters.projectId) {
+      where.stage = {
+        ...where.stage,
+        project: {
+          OR: [
+            { ownerId: filters.userId },
+            { collaborators: { some: { userId: filters.userId } } },
+          ],
+        },
+      };
+    }
+
     return await prisma.task.findMany({
       where,
-      include: { subtasks: true, stage: true },
+      include: {
+        subtasks: true,
+        stage: true,
+        assignee: { select: USER_SELECT },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -54,11 +83,16 @@ export class TaskService {
 
     return await prisma.task.findUnique({
       where: { id },
-      include: { subtasks: true, stage: true },
+      include: {
+        subtasks: true,
+        stage: true,
+        assignee: { select: USER_SELECT },
+      },
     });
   }
 
   async createTask(data: CreateTaskInput): Promise<TaskWithSubtasks> {
+    validateTextEncoding({ title: data.title, description: data.description });
     if (!data.stageId || typeof data.stageId !== 'string') {
       throw new ValidationError('Stage ID is required');
     }
@@ -69,7 +103,7 @@ export class TaskService {
 
     const stage = await prisma.stage.findUnique({
       where: { id: data.stageId },
-      select: { id: true },
+      select: { id: true, projectId: true },
     });
     if (!stage) {
       throw new NotFoundError('Stage not found');
@@ -95,6 +129,18 @@ export class TaskService {
     }
 
     const isSprintActive = data.isSprintActive !== undefined ? Boolean(data.isSprintActive) : false;
+    const tags = Array.isArray(data.tags)
+      ? Array.from(new Set(data.tags.map((t) => String(t).trim()).filter(Boolean)))
+      : [];
+
+    let assigneeId: string | null = null;
+    if (data.assigneeId) {
+      const isMember = await collaboratorService.isMemberOrOwner(stage.projectId, data.assigneeId);
+      if (!isMember) {
+        throw new ValidationError('O responsável deve ser membro ou proprietário do projeto');
+      }
+      assigneeId = data.assigneeId;
+    }
 
     return await prisma.task.create({
       data: {
@@ -105,16 +151,31 @@ export class TaskService {
             ? String(data.description).trim()
             : null,
         status,
+        tags,
         dueDate,
         isSprintActive,
+        assigneeId,
       },
-      include: { subtasks: true, stage: true },
+      include: {
+        subtasks: true,
+        stage: true,
+        assignee: { select: USER_SELECT },
+      },
     });
   }
 
   async updateTask(id: string, data: UpdateTaskInput): Promise<TaskWithSubtasks> {
+    validateTextEncoding({ title: data.title, description: data.description });
     if (!id || typeof id !== 'string') {
       throw new ValidationError('Task ID is required');
+    }
+
+    const existingTask = await prisma.task.findUnique({
+      where: { id },
+      include: { stage: { select: { projectId: true } } },
+    });
+    if (!existingTask) {
+      throw new NotFoundError('Task not found');
     }
 
     const updateData: {
@@ -122,9 +183,40 @@ export class TaskService {
       title?: string;
       description?: string | null;
       stageId?: string;
+      tags?: string[];
       dueDate?: Date | null;
       isSprintActive?: boolean;
+      assigneeId?: string | null;
     } = {};
+
+    let targetProjectId = existingTask.stage.projectId;
+
+    if (data.stageId !== undefined) {
+      if (typeof data.stageId !== 'string' || !data.stageId.trim()) {
+        throw new ValidationError('Stage ID cannot be empty');
+      }
+      const stage = await prisma.stage.findUnique({
+        where: { id: data.stageId },
+        select: { id: true, projectId: true },
+      });
+      if (!stage) {
+        throw new NotFoundError('Stage not found');
+      }
+      updateData.stageId = data.stageId;
+      targetProjectId = stage.projectId;
+    }
+
+    if (data.assigneeId !== undefined) {
+      if (data.assigneeId === null || data.assigneeId === '') {
+        updateData.assigneeId = null;
+      } else {
+        const isMember = await collaboratorService.isMemberOrOwner(targetProjectId, data.assigneeId);
+        if (!isMember) {
+          throw new ValidationError('O responsável deve ser membro ou proprietário do projeto');
+        }
+        updateData.assigneeId = data.assigneeId;
+      }
+    }
 
     if (data.status !== undefined) {
       if (!VALID_STATUSES.includes(data.status as Status)) {
@@ -140,20 +232,6 @@ export class TaskService {
         throw new ValidationError('Title cannot be empty');
       }
       updateData.title = data.title.trim();
-    }
-
-    if (data.stageId !== undefined) {
-      if (typeof data.stageId !== 'string' || !data.stageId.trim()) {
-        throw new ValidationError('Stage ID cannot be empty');
-      }
-      const stage = await prisma.stage.findUnique({
-        where: { id: data.stageId },
-        select: { id: true },
-      });
-      if (!stage) {
-        throw new NotFoundError('Stage not found');
-      }
-      updateData.stageId = data.stageId;
     }
 
     if (data.description !== undefined) {
@@ -177,11 +255,21 @@ export class TaskService {
       updateData.isSprintActive = Boolean(data.isSprintActive);
     }
 
+    if (data.tags !== undefined && Array.isArray(data.tags)) {
+      updateData.tags = Array.from(
+        new Set(data.tags.map((t) => String(t).trim()).filter(Boolean))
+      );
+    }
+
     try {
       return await prisma.task.update({
         where: { id },
         data: updateData,
-        include: { subtasks: true, stage: true },
+        include: {
+          subtasks: true,
+          stage: true,
+          assignee: { select: USER_SELECT },
+        },
       });
     } catch (error: any) {
       if (error && typeof error === 'object' && 'code' in error && error.code === 'P2025') {

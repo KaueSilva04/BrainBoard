@@ -4,3 +4,6 @@ dist/
 *.log
 .DS_Store
 .agents/
+tests/test_execution_report.json
+
+.tmp-*

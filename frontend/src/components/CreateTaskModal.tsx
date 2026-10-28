@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, Sparkles, Layers, CheckCircle2, Clock, PlayCircle, Calendar, Flame } from 'lucide-react';
-import type { Stage, TaskStatus, CreateTaskInput } from '../types';
-import { TASK_STATUS_LABELS } from '../types';
+import { X, Loader2, Sparkles, Layers, CheckCircle2, Clock, PlayCircle, Calendar, Flame, User, Tag, Plus } from 'lucide-react';
+import type { Stage, TaskStatus, CreateTaskInput, ProjectCollaborator } from '../types';
+import { TASK_STATUS_LABELS, PRESET_TASK_TAGS, getTagBadgeClasses } from '../types';
+import { useAccessibleModal } from '../hooks/useAccessibleModal';
 
 export interface CreateTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   stages: Stage[];
   defaultStageId?: string;
+  collaborators?: ProjectCollaborator[];
   onCreateTask: (stageId: string, input: CreateTaskInput) => Promise<void>;
   defaultCategory?: string;
   defaultSprintActive?: boolean;
@@ -18,24 +20,32 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   onClose,
   stages,
   defaultStageId,
+  collaborators = [],
   onCreateTask,
   defaultSprintActive = false,
 }) => {
   const [title, setTitle] = useState('');
   const [selectedStageId, setSelectedStageId] = useState<string>('');
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>('');
   const [status, setStatus] = useState<TaskStatus>('TODO');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [customTagInput, setCustomTagInput] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [isSprintActive, setIsSprintActive] = useState<boolean>(defaultSprintActive);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const dialogRef = useAccessibleModal<HTMLDivElement>(isOpen, onClose);
 
   // Sync default stage and reset fields when modal opens
   useEffect(() => {
     if (isOpen) {
       setTitle('');
       setDescription('');
+      setSelectedAssigneeId('');
       setStatus('TODO');
+      setSelectedTags([]);
+      setCustomTagInput('');
       setDueDate('');
       setIsSprintActive(Boolean(defaultSprintActive));
       setErrorMessage('');
@@ -49,18 +59,24 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     }
   }, [isOpen, defaultStageId, stages, defaultSprintActive]);
 
-  // Handle ESC key press
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
   if (!isOpen) return null;
+
+  const toggleTag = (tag: string) => {
+    const clean = tag.trim().replace(/^#/, '');
+    if (!clean) return;
+    setSelectedTags((prev) =>
+      prev.includes(clean) ? prev.filter((t) => t !== clean) : [...prev, clean]
+    );
+  };
+
+  const handleAddCustomTag = () => {
+    const clean = customTagInput.trim().replace(/^#/, '');
+    if (!clean) return;
+    if (!selectedTags.includes(clean)) {
+      setSelectedTags((prev) => [...prev, clean]);
+    }
+    setCustomTagInput('');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,8 +100,10 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         title: cleanTitle,
         description: description.trim() || undefined,
         status,
+        tags: selectedTags,
         dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
         isSprintActive,
+        assigneeId: selectedAssigneeId || undefined,
       });
       onClose();
     } catch (err: any) {
@@ -108,44 +126,49 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       label: TASK_STATUS_LABELS.TODO,
       icon: <Clock className="w-4 h-4" />,
       activeBorder: 'border-amber-400 ring-2 ring-amber-400/20',
-      activeBg: 'bg-amber-50/80',
-      textColor: 'text-amber-700',
+      activeBg: 'bg-amber-50/80 dark:bg-amber-950/50',
+      textColor: 'text-amber-700 dark:text-amber-300',
     },
     {
       id: 'IN_PROGRESS',
       label: TASK_STATUS_LABELS.IN_PROGRESS,
       icon: <PlayCircle className="w-4 h-4" />,
       activeBorder: 'border-indigo-400 ring-2 ring-indigo-400/20',
-      activeBg: 'bg-indigo-50/80',
-      textColor: 'text-indigo-700',
+      activeBg: 'bg-indigo-50/80 dark:bg-indigo-950/50',
+      textColor: 'text-indigo-700 dark:text-indigo-300',
     },
     {
       id: 'DONE',
       label: TASK_STATUS_LABELS.DONE,
       icon: <CheckCircle2 className="w-4 h-4" />,
       activeBorder: 'border-emerald-400 ring-2 ring-emerald-400/20',
-      activeBg: 'bg-emerald-50/80',
-      textColor: 'text-emerald-700',
+      activeBg: 'bg-emerald-50/80 dark:bg-emerald-950/50',
+      textColor: 'text-emerald-700 dark:text-emerald-300',
     },
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/35 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bb-modal-backdrop">
       <div
-        className="relative w-full max-w-lg bg-white border border-slate-100 rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-task-title"
+        tabIndex={-1}
+        className="relative w-full max-w-lg bb-dialog-panel overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-100 bg-white">
+        <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-900">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-extrabold text-slate-900 leading-tight">
+              <h2 id="create-task-title" className="text-base font-extrabold text-slate-900 dark:text-slate-100 leading-tight">
                 Nova Tarefa
               </h2>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-slate-400 dark:text-slate-400">
                 Cadastre uma tarefa vinculada a uma etapa do projeto
               </p>
             </div>
@@ -153,7 +176,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           <button
             onClick={onClose}
             aria-label="Fechar"
-            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-xl hover:bg-slate-100 transition-colors"
+            className="text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -162,15 +185,15 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {errorMessage && (
-            <div className="p-3 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-xl font-medium">
+            <div className="p-3 text-xs text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800/70 rounded-xl font-medium">
               {errorMessage}
             </div>
           )}
 
           {/* Title Field */}
           <div className="space-y-1.5">
-            <label htmlFor="task-title" className="block text-xs font-bold text-slate-700">
-              Título da Tarefa <span className="text-rose-500">*</span>
+            <label htmlFor="task-title" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              Título da Tarefa <span className="text-rose-500 dark:text-rose-400">*</span>
             </label>
             <input
               id="task-title"
@@ -179,18 +202,18 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ex: Implementar autenticação via token..."
-              autoFocus
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
+              data-modal-autofocus
+              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
             />
           </div>
 
           {/* Stage Selector */}
           <div className="space-y-1.5">
-            <label htmlFor="stage-select" className="block text-xs font-bold text-slate-700">
-              Etapa (Milestone) <span className="text-rose-500">*</span>
+            <label htmlFor="stage-select" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              Etapa (Milestone) <span className="text-rose-500 dark:text-rose-400">*</span>
             </label>
             {stages.length === 0 ? (
-              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-700 flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/70 text-xs text-amber-700 dark:text-amber-300 flex items-center gap-2">
                 <Layers className="w-4 h-4 shrink-0" />
                 <span>Nenhuma etapa cadastrada neste projeto. Crie uma etapa primeiro!</span>
               </div>
@@ -199,7 +222,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 id="stage-select"
                 value={selectedStageId}
                 onChange={(e) => setSelectedStageId(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
+                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-800 dark:text-slate-200 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
               >
                 {stages.map((stage) => (
                   <option key={stage.id} value={stage.id}>
@@ -212,7 +235,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
 
           {/* Status Selector */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Status Inicial
             </label>
             <div className="grid grid-cols-3 gap-2.5">
@@ -232,7 +255,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                       className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border text-xs font-semibold transition-all ${
                         isChecked
                           ? `${opt.activeBorder} ${opt.activeBg} ${opt.textColor} shadow-xs`
-                          : 'border-slate-200/80 bg-slate-50/70 text-slate-600 hover:bg-slate-100 hover:border-slate-300'
+                          : 'border-slate-200/80 dark:border-slate-700/80 bg-slate-50/70 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
                       }`}
                     >
                       {opt.icon}
@@ -246,8 +269,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
 
           {/* Description Field */}
           <div className="space-y-1.5">
-            <label htmlFor="task-desc" className="block text-xs font-bold text-slate-700">
-              Descrição <span className="text-slate-400 font-normal">(Opcional)</span>
+            <label htmlFor="task-desc" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              Descrição <span className="text-slate-400 dark:text-slate-400 font-normal">(Opcional)</span>
             </label>
             <textarea
               id="task-desc"
@@ -256,17 +279,90 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Adicione detalhes, notas ou contexto para esta tarefa..."
-              className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all resize-none"
+              className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all resize-none"
             />
+          </div>
+
+          {/* Tags / Etiquetas Field */}
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <Tag className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Etiquetas (Tags) <span className="text-slate-400 dark:text-slate-400 font-normal">(Opcional)</span></span>
+            </label>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {Array.from(new Set([...PRESET_TASK_TAGS, ...selectedTags])).map((tag) => {
+                const isActive = selectedTags.includes(tag);
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => toggleTag(tag)}
+                    className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                      isActive
+                        ? `${getTagBadgeClasses(tag)} ring-2 ring-indigo-500/30`
+                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                    }`}
+                  >
+                    <span>{tag}</span>
+                    {isActive && <X className="w-3 h-3" />}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={customTagInput}
+                onChange={(e) => setCustomTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddCustomTag();
+                  }
+                }}
+                placeholder="Nova etiqueta personalizada (ex: API, Prioridade)..."
+                className="flex-1 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleAddCustomTag}
+                disabled={!customTagInput.trim()}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-xs font-semibold disabled:opacity-40"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Adicionar</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Assignee Field */}
+          <div className="space-y-1.5">
+            <label htmlFor="task-assignee" className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5 text-slate-500" />
+              <span>Responsável <span className="text-slate-400 dark:text-slate-400 font-normal">(Opcional)</span></span>
+            </label>
+            <select
+              id="task-assignee"
+              value={selectedAssigneeId}
+              onChange={(e) => setSelectedAssigneeId(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:bg-white dark:focus:bg-slate-900 focus:border-slate-800 focus:outline-none transition-colors"
+            >
+              <option value="">Não atribuído</option>
+              {collaborators.map((c) => (
+                <option key={c.userId} value={c.userId}>
+                  {c.name} ({c.email})
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Due Date & Sprint Active Options */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             {/* Due Date Field */}
             <div className="space-y-1">
-              <label htmlFor="task-due" className="block text-xs font-bold text-slate-700 flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5 text-indigo-500" />
-                <span>Prazo Limite <span className="text-slate-400 font-normal">(Opcional)</span></span>
+              <label htmlFor="task-due" className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                <span>Prazo Limite <span className="text-slate-400 dark:text-slate-400 font-normal">(Opcional)</span></span>
               </label>
               <input
                 id="task-due"
@@ -274,40 +370,40 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 type="datetime-local"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:bg-white dark:focus:bg-slate-900 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 focus:outline-none transition-all"
               />
             </div>
 
             {/* isSprintActive Checkbox */}
             <div className="space-y-1 flex flex-col justify-end">
-              <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200/80 bg-slate-50/70 hover:bg-slate-100/70 cursor-pointer transition-colors">
+              <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-slate-50/70 dark:bg-slate-800/70 hover:bg-slate-100/70 dark:hover:bg-slate-800/70 cursor-pointer transition-colors">
                 <input
                   type="checkbox"
                   checked={isSprintActive}
                   onChange={(e) => setIsSprintActive(e.target.checked)}
-                  className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400"
+                  className="w-4 h-4 rounded text-amber-500 dark:text-amber-400 focus:ring-amber-400"
                 />
-                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                  <Flame className="w-4 h-4 text-amber-500" />
-                  <span>Sprint Semanal</span>
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <Flame className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+                  <span>Adicionar ao foco global</span>
                 </div>
               </label>
             </div>
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors"
+              className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !title.trim() || !selectedStageId}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2"
+              className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white disabled:opacity-50 text-xs font-semibold rounded-lg transition-colors flex items-center gap-2"
             >
               {isSubmitting ? (
                 <>

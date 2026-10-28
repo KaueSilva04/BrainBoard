@@ -5,6 +5,20 @@ import type {
   CalendarFilterOptions,
 } from './calendar.types.js';
 
+async function resolveEffectiveUserId(userId?: string): Promise<string | undefined> {
+  if (userId) return userId;
+  const allowAnonymous = process.env.ALLOW_ANONYMOUS_DEV === 'true';
+  if (allowAnonymous) {
+    const defaultEmail = (process.env.DEFAULT_OWNER_EMAIL || 'admin@brainboard.local').toLowerCase().trim();
+    const admin = await prisma.user.findFirst({
+      where: { email: defaultEmail },
+      select: { id: true },
+    });
+    return admin?.id;
+  }
+  return undefined;
+}
+
 export class CalendarService {
   async getCalendarEvents(filters?: CalendarFilterOptions): Promise<CalendarEventProjection[]> {
     const aptWhere: any = {};
@@ -33,6 +47,19 @@ export class CalendarService {
 
     if (filters?.projectId) {
       taskWhere.stage = { projectId: filters.projectId };
+    } else {
+      const effectiveUserId = await resolveEffectiveUserId(filters?.userId);
+      if (effectiveUserId) {
+        taskWhere.stage = {
+          ...taskWhere.stage,
+          project: {
+            OR: [
+              { ownerId: effectiveUserId },
+              { collaborators: { some: { userId: effectiveUserId } } },
+            ],
+          },
+        };
+      }
     }
 
     if (filters?.subjectId) {
