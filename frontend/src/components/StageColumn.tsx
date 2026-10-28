@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, Plus, Milestone } from 'lucide-react';
+import { Layers, Plus, Milestone, Trash2 } from 'lucide-react';
 import type { Stage, Task, TaskStatus, ProjectCollaborator } from '../types';
 import { STAGE_STATUS_LABELS, STAGE_STATUS_COLORS } from '../types';
 import { TaskCard } from './TaskCard';
@@ -10,6 +10,7 @@ export interface StageColumnProps {
   collaborators?: ProjectCollaborator[];
   onMoveTask: (id: string, status: TaskStatus) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
+  onDeleteStage?: (stageId: string, stageTitle: string) => Promise<void>;
   onAddSubtask: (taskId: string, title: string) => Promise<void>;
   onToggleSubtask: (id: string, isDone: boolean) => Promise<void>;
   onDeleteSubtask?: (id: string) => Promise<void>;
@@ -22,13 +23,14 @@ export const StageColumn: React.FC<StageColumnProps> = ({
   collaborators,
   onMoveTask,
   onDeleteTask,
+  onDeleteStage,
   onAddSubtask,
   onToggleSubtask,
   onDeleteSubtask,
   onOpenCreateTaskForStage,
 }) => {
   return (
-    <div className="bb-kanban-column flex min-h-[280px] min-w-0 flex-col">
+    <div className="bb-kanban-column group/stage flex min-h-[280px] min-w-0 flex-col">
       {/* Column Header */}
       <div className="bb-kanban-column-header flex items-center justify-between gap-3 px-5 py-4">
         <div className="flex items-center gap-2 min-w-0">
@@ -48,6 +50,17 @@ export const StageColumn: React.FC<StageColumnProps> = ({
           <span className="bb-tabular font-mono px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-100/80 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/70">
             {tasks.length}
           </span>
+          {onDeleteStage && (
+            <button
+              type="button"
+              onClick={() => onDeleteStage(stage.id, stage.title)}
+              title={`Excluir etapa "${stage.title}"`}
+              aria-label={`Excluir etapa ${stage.title}`}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-slate-500 dark:hover:bg-rose-950/60 dark:hover:text-rose-400"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
 

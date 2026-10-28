@@ -27,6 +27,8 @@ projectsRouter.delete('/api/sprints/:sprintId', sprintController.deleteSprint);
 // Stages
 projectsRouter.get('/api/projects/:projectId/stages', controller.listStagesByProject);
 projectsRouter.post('/api/projects/:projectId/stages', controller.createStage);
+projectsRouter.patch('/api/projects/:projectId/stages/:id', controller.updateStage);
+projectsRouter.delete('/api/projects/:projectId/stages/:id', controller.deleteStage);
 projectsRouter.get('/api/stages/:id', controller.getStageById);
 projectsRouter.patch('/api/stages/:id', controller.updateStage);
 projectsRouter.delete('/api/stages/:id', controller.deleteStage);

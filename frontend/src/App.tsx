@@ -234,6 +234,29 @@ const AppContent: React.FC = () => {
     });
   };
 
+  const handleDeleteStage = async (stageId: string, stageTitle: string) => {
+    if (!activeProject) return;
+    const confirmed = window.confirm(
+      `Tem certeza que deseja excluir a etapa "${stageTitle}" e todas as tarefas vinculadas a ela?`
+    );
+    if (!confirmed) return;
+
+    const prevProject = activeProject;
+    setActiveProject({
+      ...activeProject,
+      stages: (activeProject.stages || []).filter((s) => s.id !== stageId),
+    });
+
+    try {
+      await stagesApi.delete(activeProject.id, stageId);
+      await loadProjects(true);
+    } catch (err) {
+      console.error('Failed to delete stage:', err);
+      setActiveProject(prevProject);
+      alert('Erro ao excluir etapa.');
+    }
+  };
+
   const handleCreateTask = async (stageId: string, input: CreateTaskInput) => {
     const newTask = await tasksApi.create(stageId, input);
     const completeTask: Task = {
@@ -512,6 +535,7 @@ const AppContent: React.FC = () => {
               searchQuery={searchQuery}
               onMoveTask={handleMoveTask}
               onDeleteTask={handleDeleteTask}
+              onDeleteStage={handleDeleteStage}
               onAddSubtask={handleAddSubtask}
               onToggleSubtask={handleToggleSubtask}
               onDeleteSubtask={handleDeleteSubtask}

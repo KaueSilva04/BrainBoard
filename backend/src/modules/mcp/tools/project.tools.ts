@@ -39,6 +39,17 @@ export const projectToolSchemas: Tool[] = [
     },
   },
   {
+    name: 'delete_stage',
+    description: 'Exclui uma etapa (stage/coluna) de um projeto e as tarefas vinculadas a ela.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        stageId: { type: 'string', description: 'ID da etapa (stage) a ser excluída.' },
+      },
+      required: ['stageId'],
+    },
+  },
+  {
     name: 'read_project_context',
     description:
       'Lê o contexto completo do projeto para a IA: metadados, businessLogic, githubRepo, settings, etapas com tarefas e subtarefas, logs de atualização e membros.',
@@ -217,6 +228,41 @@ export async function handleProjectTools(name: string, args: any, userId?: strin
 
     return {
       content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: `Etapa '${stage.title}' criada com sucesso.`, id: stage.id, stage }, null, 2) }],
+    };
+  }
+
+  if (name === 'delete_stage') {
+    const stageId = String(args?.stageId ?? '').trim();
+    if (!stageId) throw new Error('stageId é obrigatório');
+
+    const existingStage = await stageService.getStageById(stageId);
+    if (!existingStage) {
+      throw new Error(`Etapa não encontrada para o ID: ${stageId}`);
+    }
+
+    if (userId) {
+      const hasAccess = await collaboratorService.isMemberOrOwner(existingStage.projectId, userId);
+      if (!hasAccess) {
+        throw new Error('Acesso negado: você não é proprietário nem colaborador deste projeto');
+      }
+    }
+
+    const deleted = await stageService.deleteStage(stageId);
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: JSON.stringify(
+            {
+              success: true,
+              message: `Etapa '${deleted.title}' excluída com sucesso.`,
+              id: deleted.id,
+            },
+            null,
+            2
+          ),
+        },
+      ],
     };
   }
 

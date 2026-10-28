@@ -15,6 +15,7 @@ export interface KanbanBoardProps {
   onOpenCollaboratorsModal?: () => void;
   onMoveTask: (id: string, status: TaskStatus) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
+  onDeleteStage?: (stageId: string, stageTitle: string) => Promise<void>;
   onAddSubtask: (taskId: string, title: string) => Promise<void>;
   onToggleSubtask: (id: string, isDone: boolean) => Promise<void>;
   onDeleteSubtask?: (id: string) => Promise<void>;
@@ -33,6 +34,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onOpenCollaboratorsModal,
   onMoveTask,
   onDeleteTask,
+  onDeleteStage,
   onAddSubtask,
   onToggleSubtask,
   onDeleteSubtask,
@@ -149,6 +151,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   collaborators={collaborators}
                   onMoveTask={onMoveTask}
                   onDeleteTask={onDeleteTask}
+                  onDeleteStage={onDeleteStage}
                   onAddSubtask={onAddSubtask}
                   onToggleSubtask={onToggleSubtask}
                   onDeleteSubtask={onDeleteSubtask}
