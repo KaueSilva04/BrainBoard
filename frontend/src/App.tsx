@@ -299,6 +299,43 @@ const AppContent: React.FC = () => {
     }
   };
 
+  const handleMoveTaskToStage = async (taskId: string, targetStageId: string) => {
+    if (!activeProject) return;
+    const allTasks = activeProject.stages.flatMap((s) => s.tasks || []);
+    const movingTask = allTasks.find((t) => t.id === taskId);
+    if (!movingTask || movingTask.stageId === targetStageId) return;
+
+    const prevProject = activeProject;
+    const updatedTask: Task = { ...movingTask, stageId: targetStageId };
+
+    setActiveProject({
+      ...activeProject,
+      stages: activeProject.stages.map((stage) => {
+        if (stage.id === movingTask.stageId) {
+          return {
+            ...stage,
+            tasks: stage.tasks.filter((t) => t.id !== taskId),
+          };
+        }
+        if (stage.id === targetStageId) {
+          return {
+            ...stage,
+            tasks: [...stage.tasks, updatedTask],
+          };
+        }
+        return stage;
+      }),
+    });
+
+    try {
+      await tasksApi.update(taskId, { stageId: targetStageId });
+    } catch (err) {
+      console.error('Failed to move task to stage:', err);
+      setActiveProject(prevProject);
+      alert('Erro ao mover tarefa de etapa.');
+    }
+  };
+
   const handleDeleteTask = async (id: string) => {
     if (!activeProject) return;
     const prevProject = activeProject;
@@ -534,6 +571,7 @@ const AppContent: React.FC = () => {
               onOpenCollaboratorsModal={() => setIsCollaboratorsModalOpen(true)}
               searchQuery={searchQuery}
               onMoveTask={handleMoveTask}
+              onMoveTaskToStage={handleMoveTaskToStage}
               onDeleteTask={handleDeleteTask}
               onDeleteStage={handleDeleteStage}
               onAddSubtask={handleAddSubtask}

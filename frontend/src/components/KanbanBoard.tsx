@@ -14,6 +14,7 @@ export interface KanbanBoardProps {
   collaborators?: ProjectCollaborator[];
   onOpenCollaboratorsModal?: () => void;
   onMoveTask: (id: string, status: TaskStatus) => Promise<void>;
+  onMoveTaskToStage?: (taskId: string, targetStageId: string) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
   onDeleteStage?: (stageId: string, stageTitle: string) => Promise<void>;
   onAddSubtask: (taskId: string, title: string) => Promise<void>;
@@ -33,6 +34,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   collaborators = [],
   onOpenCollaboratorsModal,
   onMoveTask,
+  onMoveTaskToStage,
   onDeleteTask,
   onDeleteStage,
   onAddSubtask,
@@ -147,9 +149,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 <StageColumn
                   key={stage.id}
                   stage={stage}
+                  stages={stages}
                   tasks={stageTasks}
                   collaborators={collaborators}
                   onMoveTask={onMoveTask}
+                  onMoveTaskToStage={onMoveTaskToStage}
                   onDeleteTask={onDeleteTask}
                   onDeleteStage={onDeleteStage}
                   onAddSubtask={onAddSubtask}
@@ -188,8 +192,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           <KanbanColumn
             status="TODO"
             tasks={todoTasks}
+            stages={stages}
             collaborators={collaborators}
             onMoveTask={onMoveTask}
+            onMoveTaskToStage={onMoveTaskToStage}
             onDeleteTask={onDeleteTask}
             onAddSubtask={onAddSubtask}
             onToggleSubtask={onToggleSubtask}
@@ -199,8 +205,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           <KanbanColumn
             status="IN_PROGRESS"
             tasks={inProgressTasks}
+            stages={stages}
             collaborators={collaborators}
             onMoveTask={onMoveTask}
+            onMoveTaskToStage={onMoveTaskToStage}
             onDeleteTask={onDeleteTask}
             onAddSubtask={onAddSubtask}
             onToggleSubtask={onToggleSubtask}
@@ -210,8 +218,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           <KanbanColumn
             status="DONE"
             tasks={doneTasks}
+            stages={stages}
             collaborators={collaborators}
             onMoveTask={onMoveTask}
+            onMoveTaskToStage={onMoveTaskToStage}
             onDeleteTask={onDeleteTask}
             onAddSubtask={onAddSubtask}
             onToggleSubtask={onToggleSubtask}

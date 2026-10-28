@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Layers, Plus, Milestone, Trash2 } from 'lucide-react';
 import type { Stage, Task, TaskStatus, ProjectCollaborator } from '../types';
 import { STAGE_STATUS_LABELS, STAGE_STATUS_COLORS } from '../types';
@@ -6,9 +6,11 @@ import { TaskCard } from './TaskCard';
 
 export interface StageColumnProps {
   stage: Stage;
+  stages?: Stage[];
   tasks: Task[];
   collaborators?: ProjectCollaborator[];
   onMoveTask: (id: string, status: TaskStatus) => Promise<void>;
+  onMoveTaskToStage?: (taskId: string, targetStageId: string) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
   onDeleteStage?: (stageId: string, stageTitle: string) => Promise<void>;
   onAddSubtask: (taskId: string, title: string) => Promise<void>;
@@ -19,9 +21,11 @@ export interface StageColumnProps {
 
 export const StageColumn: React.FC<StageColumnProps> = ({
   stage,
+  stages,
   tasks,
   collaborators,
   onMoveTask,
+  onMoveTaskToStage,
   onDeleteTask,
   onDeleteStage,
   onAddSubtask,
@@ -29,8 +33,40 @@ export const StageColumn: React.FC<StageColumnProps> = ({
   onDeleteSubtask,
   onOpenCreateTaskForStage,
 }) => {
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!isDragOver) setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const taskId = e.dataTransfer.getData('text/plain');
+    if (taskId && onMoveTaskToStage) {
+      await onMoveTaskToStage(taskId, stage.id);
+    }
+  };
+
   return (
-    <div className="bb-kanban-column group/stage flex min-h-[280px] min-w-0 flex-col">
+    <div
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={(e) => void handleDrop(e)}
+      className={`bb-kanban-column group/stage flex min-h-[280px] min-w-0 flex-col transition-all ${
+        isDragOver
+          ? 'ring-2 ring-indigo-500/70 bg-indigo-50/40 dark:bg-indigo-950/30 border-indigo-400 dark:border-indigo-500'
+          : ''
+      }`}
+    >
       {/* Column Header */}
       <div className="bb-kanban-column-header flex items-center justify-between gap-3 px-5 py-4">
         <div className="flex items-center gap-2 min-w-0">
@@ -85,8 +121,10 @@ export const StageColumn: React.FC<StageColumnProps> = ({
               key={task.id}
               task={task}
               stageName={stage.title}
+              stages={stages}
               collaborators={collaborators}
               onMoveTask={onMoveTask}
+              onMoveTaskToStage={onMoveTaskToStage}
               onDeleteTask={onDeleteTask}
               onAddSubtask={onAddSubtask}
               onToggleSubtask={onToggleSubtask}

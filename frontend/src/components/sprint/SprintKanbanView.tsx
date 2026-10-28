@@ -49,6 +49,8 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({
   const [isAddToSprintOpen, setIsAddToSprintOpen] = useState<boolean>(false);
   const [movingTaskId, setMovingTaskId] = useState<string | null>(null);
   const [removingTaskId, setRemovingTaskId] = useState<string | null>(null);
+  const [dragOverCol, setDragOverCol] = useState<TaskStatus | null>(null);
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
 
   // Subtask management inline state
   const [activeSubtaskFormId, setActiveSubtaskFormId] = useState<string | null>(null);
@@ -439,7 +441,30 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({
             return (
               <div
                 key={col.status}
-                className="bb-kanban-column rounded-2xl p-4 flex min-w-0 flex-col min-h-[280px] md:min-h-[500px]"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  if (dragOverCol !== col.status) setDragOverCol(col.status);
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                    setDragOverCol(null);
+                  }
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverCol(null);
+                  const droppedTaskId = e.dataTransfer.getData('text/plain');
+                  const targetTask = tasks.find((t) => t.id === droppedTaskId);
+                  if (targetTask && targetTask.status !== col.status) {
+                    void handleMoveTask(targetTask, col.status);
+                  }
+                }}
+                className={`bb-kanban-column rounded-2xl p-4 flex min-w-0 flex-col min-h-[280px] md:min-h-[500px] transition-all ${
+                  dragOverCol === col.status
+                    ? 'ring-2 ring-amber-500/70 bg-amber-50/40 dark:bg-amber-950/30 border-amber-400 dark:border-amber-500'
+                    : ''
+                }`}
               >
                 {/* Column Header */}
                 <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/60 dark:border-slate-700/60">
@@ -469,7 +494,19 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({
                       return (
                         <div
                           key={task.id}
-                          className="bb-panel bb-card-motion group space-y-3 p-4 hover:border-amber-300 dark:hover:border-amber-800/70"
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('text/plain', task.id);
+                            e.dataTransfer.effectAllowed = 'move';
+                            setDraggingTaskId(task.id);
+                          }}
+                          onDragEnd={() => {
+                            setDraggingTaskId(null);
+                            setDragOverCol(null);
+                          }}
+                          className={`bb-panel bb-card-motion group space-y-3 p-4 hover:border-amber-300 dark:hover:border-amber-800/70 cursor-grab active:cursor-grabbing transition-all ${
+                            draggingTaskId === task.id ? 'opacity-50 scale-[0.98] ring-2 ring-amber-500/50' : ''
+                          }`}
                         >
                           {/* Card Header: Stage badge + Due Date & Remove button */}
                           <div className="flex items-start justify-between gap-2">
