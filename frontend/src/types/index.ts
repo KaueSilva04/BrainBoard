@@ -415,14 +415,9 @@ export function getTaskTags(task: { tags?: string[] | null; title?: string; desc
   const result = new Set<string>();
   if (Array.isArray(task.tags)) {
     task.tags.forEach((t) => {
-      const trimmed = String(t).trim();
+      const trimmed = String(t).trim().replace(/^#/, '');
       if (trimmed) result.add(trimmed);
     });
-  }
-  const text = `${task.title || ''} ${task.description || ''}`;
-  const matches = text.match(/#[a-zA-Z0-9_\u00C0-\u017F-]+/g);
-  if (matches) {
-    matches.forEach((m) => result.add(m.replace(/^#/, '')));
   }
   return Array.from(result);
 }
