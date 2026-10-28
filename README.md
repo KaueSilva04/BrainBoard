@@ -11,11 +11,11 @@
 
 ## 🎯 Principais Funcionalidades
 
-### 1. 📋 Gestão de Projetos e Kanban
-- Gerenciamento completo de projetos (criação, edição e exclusão).
-- Quadro Kanban intuitivo com colunas personalizáveis (Etapas/Stages).
-- Criação de Tarefas, subtarefas (checklists) e alteração de status via drag-and-drop.
-- **Sprint Semanal:** Filtro inteligente para isolar as tarefas que devem ser entregues na semana atual.
+### 1. 📋 Gestão de Projetos, Colaboradores e Kanban
+- **Autenticação e Equipes:** Contas de usuário, proprietário (`OWNER`) e convite de colaboradores (`COLLABORATOR`) por projeto, com atribuição de tarefas a responsáveis.
+- **Quadro Kanban Dual (Por Status e Por Etapa):** Arraste e solte (`Drag-and-Drop`) tarefas entre etapas ou status, ou mova com 1 clique pelo seletor rápido.
+- **Etiquetas (`Tags`) e Filtros Avançados:** Classifique tarefas com etiquetas coloridas e filtre todo o quadro ou cada etapa individualmente por etiqueta, status, responsável ou foco.
+- **Foco / Sprint Semanal:** Isolamento rápido das tarefas prioritárias do projeto ou globais.
 
 ### 2. 🎓 Área Acadêmica
 - Módulo isolado focado em estudantes e produtividade universitária.
@@ -31,7 +31,7 @@ O verdadeiro poder do BrainBoard. O backend expõe um servidor **MCP via SSE (Se
 - A IA pode ler o contexto do projeto, alterar a lógica de negócios e ver o que está no Kanban.
 - A IA pode criar tarefas em lote, manipular Sprints e alterar disciplinas sem precisar que você toque no mouse.
 - Respostas estruturadas em JSON garantem alta precisão nas automações.
-- *Para ver os detalhes, leia a documentação oficial: [`MCP_DOCUMENTATION.md`](./MCP_DOCUMENTATION.md).*
+- *Para ver os detalhes, leia a documentação oficial: [`backend/MCP_DOCUMENTATION.md`](./backend/MCP_DOCUMENTATION.md).*
 
 ---
 
