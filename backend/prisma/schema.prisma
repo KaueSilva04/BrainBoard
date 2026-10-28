@@ -145,6 +145,7 @@ model Task {
   title          String
   description    String?
   status         Status    @default(TODO)
+  tags           String[]  @default([])
   dueDate        DateTime?
   isSprintActive Boolean?  @default(false)
   stageId        String

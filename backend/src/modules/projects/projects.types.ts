@@ -98,6 +98,7 @@ export interface CreateTaskInput {
   title: string;
   description?: string | null | undefined;
   status?: string | undefined;
+  tags?: string[] | undefined;
   dueDate?: Date | string | null | undefined;
   isSprintActive?: boolean | undefined;
   assigneeId?: string | null | undefined;
@@ -108,6 +109,7 @@ export interface UpdateTaskInput {
   title?: string | undefined;
   description?: string | null | undefined;
   status?: string | undefined;
+  tags?: string[] | undefined;
   dueDate?: Date | string | null | undefined;
   isSprintActive?: boolean | undefined;
   assigneeId?: string | null | undefined;
@@ -117,6 +119,7 @@ export interface TaskFilterOptions {
   stageId?: string | undefined;
   projectId?: string | undefined;
   status?: string | undefined;
+  tag?: string | undefined;
   isSprintActive?: boolean | undefined;
   hasDueDate?: boolean | undefined;
   userId?: string | undefined;

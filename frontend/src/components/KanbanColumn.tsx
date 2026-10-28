@@ -11,6 +11,7 @@ export interface KanbanColumnProps {
   collaborators?: ProjectCollaborator[];
   onMoveTask: (id: string, status: TaskStatus) => Promise<void>;
   onMoveTaskToStage?: (taskId: string, targetStageId: string) => Promise<void>;
+  onUpdateTaskTags?: (taskId: string, tags: string[]) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
   onAddSubtask: (taskId: string, title: string) => Promise<void>;
   onToggleSubtask: (id: string, isDone: boolean) => Promise<void>;
@@ -25,6 +26,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   collaborators,
   onMoveTask,
   onMoveTaskToStage,
+  onUpdateTaskTags,
   onDeleteTask,
   onAddSubtask,
   onToggleSubtask,
@@ -121,6 +123,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
               collaborators={collaborators}
               onMoveTask={onMoveTask}
               onMoveTaskToStage={onMoveTaskToStage}
+              onUpdateTaskTags={onUpdateTaskTags}
               onDeleteTask={onDeleteTask}
               onAddSubtask={onAddSubtask}
               onToggleSubtask={onToggleSubtask}

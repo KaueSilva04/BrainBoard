@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, Sparkles, Layers, CheckCircle2, Clock, PlayCircle, Calendar, Flame, User } from 'lucide-react';
+import { X, Loader2, Sparkles, Layers, CheckCircle2, Clock, PlayCircle, Calendar, Flame, User, Tag, Plus } from 'lucide-react';
 import type { Stage, TaskStatus, CreateTaskInput, ProjectCollaborator } from '../types';
-import { TASK_STATUS_LABELS } from '../types';
+import { TASK_STATUS_LABELS, PRESET_TASK_TAGS, getTagBadgeClasses } from '../types';
 import { useAccessibleModal } from '../hooks/useAccessibleModal';
 
 export interface CreateTaskModalProps {
@@ -28,6 +28,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   const [selectedStageId, setSelectedStageId] = useState<string>('');
   const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>('');
   const [status, setStatus] = useState<TaskStatus>('TODO');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [customTagInput, setCustomTagInput] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [isSprintActive, setIsSprintActive] = useState<boolean>(defaultSprintActive);
@@ -42,6 +44,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       setDescription('');
       setSelectedAssigneeId('');
       setStatus('TODO');
+      setSelectedTags([]);
+      setCustomTagInput('');
       setDueDate('');
       setIsSprintActive(Boolean(defaultSprintActive));
       setErrorMessage('');
@@ -56,6 +60,23 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   }, [isOpen, defaultStageId, stages, defaultSprintActive]);
 
   if (!isOpen) return null;
+
+  const toggleTag = (tag: string) => {
+    const clean = tag.trim().replace(/^#/, '');
+    if (!clean) return;
+    setSelectedTags((prev) =>
+      prev.includes(clean) ? prev.filter((t) => t !== clean) : [...prev, clean]
+    );
+  };
+
+  const handleAddCustomTag = () => {
+    const clean = customTagInput.trim().replace(/^#/, '');
+    if (!clean) return;
+    if (!selectedTags.includes(clean)) {
+      setSelectedTags((prev) => [...prev, clean]);
+    }
+    setCustomTagInput('');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,6 +100,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         title: cleanTitle,
         description: description.trim() || undefined,
         status,
+        tags: selectedTags,
         dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
         isSprintActive,
         assigneeId: selectedAssigneeId || undefined,
@@ -259,6 +281,58 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               placeholder="Adicione detalhes, notas ou contexto para esta tarefa..."
               className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all resize-none"
             />
+          </div>
+
+          {/* Tags / Etiquetas Field */}
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <Tag className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Etiquetas (Tags) <span className="text-slate-400 dark:text-slate-400 font-normal">(Opcional)</span></span>
+            </label>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {Array.from(new Set([...PRESET_TASK_TAGS, ...selectedTags])).map((tag) => {
+                const isActive = selectedTags.includes(tag);
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => toggleTag(tag)}
+                    className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                      isActive
+                        ? `${getTagBadgeClasses(tag)} ring-2 ring-indigo-500/30`
+                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                    }`}
+                  >
+                    <span>{tag}</span>
+                    {isActive && <X className="w-3 h-3" />}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={customTagInput}
+                onChange={(e) => setCustomTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddCustomTag();
+                  }
+                }}
+                placeholder="Nova etiqueta personalizada (ex: API, Prioridade)..."
+                className="flex-1 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleAddCustomTag}
+                disabled={!customTagInput.trim()}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-xs font-semibold disabled:opacity-40"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Adicionar</span>
+              </button>
+            </div>
           </div>
 
           {/* Assignee Field */}

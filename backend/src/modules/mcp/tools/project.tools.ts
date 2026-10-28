@@ -39,6 +39,20 @@ export const projectToolSchemas: Tool[] = [
     },
   },
   {
+    name: 'update_stage',
+    description: 'Atualiza o título, status (PLANNING, IN_PROGRESS, COMPLETED) ou ordem de uma etapa (stage).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        stageId: { type: 'string', description: 'ID da etapa (stage).' },
+        title: { type: 'string', description: 'Novo título da etapa.' },
+        status: { type: 'string', enum: ['PLANNING', 'IN_PROGRESS', 'COMPLETED'], description: 'Novo status da etapa.' },
+        order: { type: 'number', description: 'Nova ordem da etapa no projeto.' },
+      },
+      required: ['stageId'],
+    },
+  },
+  {
     name: 'delete_stage',
     description: 'Exclui uma etapa (stage/coluna) de um projeto e as tarefas vinculadas a ela.',
     inputSchema: {
@@ -228,6 +242,38 @@ export async function handleProjectTools(name: string, args: any, userId?: strin
 
     return {
       content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: `Etapa '${stage.title}' criada com sucesso.`, id: stage.id, stage }, null, 2) }],
+    };
+  }
+
+  if (name === 'update_stage') {
+    const stageId = String(args?.stageId ?? '').trim();
+    if (!stageId) throw new Error('stageId é obrigatório');
+
+    const existingStage = await stageService.getStageById(stageId);
+    if (!existingStage) {
+      throw new Error(`Etapa não encontrada para o ID: ${stageId}`);
+    }
+
+    if (userId) {
+      const hasAccess = await collaboratorService.isMemberOrOwner(existingStage.projectId, userId);
+      if (!hasAccess) {
+        throw new Error('Acesso negado: você não é proprietário nem colaborador deste projeto');
+      }
+    }
+
+    const updated = await stageService.updateStage(stageId, {
+      ...(args?.title !== undefined ? { title: String(args.title).trim() } : {}),
+      ...(args?.status !== undefined ? { status: String(args.status).trim() } : {}),
+      ...(typeof args?.order === 'number' ? { order: args.order } : {}),
+    });
+
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: JSON.stringify({ success: true, message: `Etapa '${updated.title}' atualizada com sucesso.`, id: updated.id, stage: updated }, null, 2),
+        },
+      ],
     };
   }
 

@@ -15,9 +15,11 @@ import {
   Check,
   GripVertical,
   Milestone,
+  Tag,
+  X,
 } from 'lucide-react';
 import type { Task, TaskStatus, Stage, ProjectCollaborator, AuthUser } from '../types';
-import { TASK_STATUS_LABELS } from '../types';
+import { TASK_STATUS_LABELS, PRESET_TASK_TAGS, getTagBadgeClasses, getTaskTags } from '../types';
 import { SubtaskItem } from './SubtaskItem';
 import { tasksApi } from '../services/api';
 import { getInitials } from './collaborators/AvatarStack';
@@ -29,6 +31,7 @@ export interface TaskCardProps {
   collaborators?: ProjectCollaborator[];
   onMoveTask: (id: string, status: TaskStatus) => Promise<void>;
   onMoveTaskToStage?: (taskId: string, targetStageId: string) => Promise<void>;
+  onUpdateTaskTags?: (taskId: string, tags: string[]) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
   onAddSubtask: (taskId: string, title: string) => Promise<void>;
   onToggleSubtask: (id: string, isDone: boolean) => Promise<void>;
@@ -43,6 +46,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   collaborators,
   onMoveTask,
   onMoveTaskToStage,
+  onUpdateTaskTags,
   onDeleteTask,
   onAddSubtask,
   onToggleSubtask,
@@ -61,6 +65,45 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const [isAssigning, setIsAssigning] = useState(false);
   const [isStageMenuOpen, setIsStageMenuOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [tags, setTags] = useState<string[]>(() => getTaskTags(task));
+  const [isTagMenuOpen, setIsTagMenuOpen] = useState(false);
+  const [newTagInput, setNewTagInput] = useState('');
+  const [isSavingTags, setIsSavingTags] = useState(false);
+
+  const handleSaveTags = async (nextTags: string[]) => {
+    const cleanTags = Array.from(new Set(nextTags.map((t) => t.trim().replace(/^#/, '')).filter(Boolean)));
+    const prevTags = tags;
+    setTags(cleanTags);
+    setIsSavingTags(true);
+    try {
+      if (onUpdateTaskTags) {
+        await onUpdateTaskTags(task.id, cleanTags);
+      } else {
+        await tasksApi.update(task.id, { tags: cleanTags });
+      }
+    } catch (err) {
+      console.error('Failed to update task tags:', err);
+      setTags(prevTags);
+    } finally {
+      setIsSavingTags(false);
+    }
+  };
+
+  const handleToggleTag = (tag: string) => {
+    const clean = tag.trim().replace(/^#/, '');
+    if (!clean) return;
+    const next = tags.includes(clean) ? tags.filter((t) => t !== clean) : [...tags, clean];
+    void handleSaveTags(next);
+  };
+
+  const handleAddCustomTag = () => {
+    const clean = newTagInput.trim().replace(/^#/, '');
+    if (!clean) return;
+    setNewTagInput('');
+    if (!tags.includes(clean)) {
+      void handleSaveTags([...tags, clean]);
+    }
+  };
 
   const handleAssign = async (collab: ProjectCollaborator | null) => {
     setIsAssigning(true);
@@ -374,8 +417,104 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         )}
       </div>
 
-      {/* Assignee indicator & quick switcher */}
-      <div className="relative flex items-center justify-between text-xs">
+      {/* Assignee & Tags row */}
+      <div className="relative flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* Existing Tags Chips */}
+          {tags.map((tag) => (
+            <span
+              key={tag}
+              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getTagBadgeClasses(
+                tag
+              )}`}
+            >
+              <span>{tag}</span>
+              <button
+                type="button"
+                onClick={() => handleToggleTag(tag)}
+                title={`Remover etiqueta ${tag}`}
+                className="opacity-70 hover:opacity-100"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </span>
+          ))}
+
+          {/* Add / Manage Tags Popover Trigger */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsTagMenuOpen(!isTagMenuOpen)}
+              disabled={isSavingTags}
+              title="Gerenciar etiquetas da tarefa"
+              className="inline-flex items-center gap-1 rounded-full border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-2 py-0.5 text-[10px] font-semibold text-slate-500 hover:border-indigo-400 hover:text-indigo-600 dark:text-slate-400 dark:hover:border-indigo-600 dark:hover:text-indigo-400 transition-colors"
+            >
+              <Tag className="h-2.5 w-2.5" />
+              <span>{tags.length === 0 ? '+ Etiqueta' : '+'}</span>
+            </button>
+
+            {isTagMenuOpen && (
+              <div className="absolute left-0 top-full z-30 mt-1 w-56 rounded-xl border border-slate-200 bg-white p-2.5 shadow-lg dark:border-slate-700 dark:bg-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Etiquetas
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsTagMenuOpen(false)}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {Array.from(new Set([...PRESET_TASK_TAGS, ...tags])).map((preset) => {
+                    const isActive = tags.includes(preset);
+                    return (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => handleToggleTag(preset)}
+                        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-all ${
+                          isActive
+                            ? `${getTagBadgeClasses(preset)} ring-1 ring-indigo-500/40`
+                            : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'
+                        }`}
+                      >
+                        <span>{preset}</span>
+                        {isActive && <Check className="h-2.5 w-2.5" />}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-1 pt-1 border-t border-slate-100 dark:border-slate-700">
+                  <input
+                    type="text"
+                    value={newTagInput}
+                    onChange={(e) => setNewTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCustomTag();
+                      }
+                    }}
+                    placeholder="Nova etiqueta..."
+                    className="flex-1 min-w-0 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-2 py-1 text-[11px] text-slate-800 dark:text-slate-200 focus:border-indigo-500 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCustomTag}
+                    disabled={!newTagInput.trim()}
+                    className="rounded-lg bg-slate-900 px-2 py-1 text-[10px] font-semibold text-white disabled:opacity-40 dark:bg-slate-100 dark:text-slate-900"
+                  >
+                    OK
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="relative">
           <button
             type="button"

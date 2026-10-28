@@ -561,10 +561,11 @@ export const deleteMember = async (req: Request, res: Response) => {
 
 export const listTasks = async (req: Request, res: Response) => {
   try {
-    const { status, isSprintActive, hasDueDate, projectId } = req.query;
+    const { status, isSprintActive, hasDueDate, projectId, tag } = req.query;
     const stageId = req.query.stageId ? String(req.query.stageId).trim() : undefined;
     const projId = projectId ? String(projectId).trim() : undefined;
     const statusStr = status ? String(status) : undefined;
+    const tagStr = tag ? String(tag).trim() : undefined;
 
     if (statusStr && !VALID_STATUSES.includes(statusStr as any)) {
       return res.status(400).json({
@@ -576,6 +577,7 @@ export const listTasks = async (req: Request, res: Response) => {
       stageId,
       projectId: projId,
       status: statusStr,
+      tag: tagStr,
       isSprintActive: isSprintActive !== undefined ? isSprintActive === 'true' : undefined,
       hasDueDate: hasDueDate !== undefined ? hasDueDate === 'true' : undefined,
       userId: req.user?.id,
@@ -621,7 +623,7 @@ export const getTaskById = async (req: Request, res: Response) => {
 export const createTask = async (req: Request, res: Response) => {
   try {
     const stageIdFromParams = req.params?.stageId;
-    const { title, stageId: stageIdFromBody, description, status, dueDate, isSprintActive, assigneeId } = req.body;
+    const { title, stageId: stageIdFromBody, description, status, tags, dueDate, isSprintActive, assigneeId } = req.body;
     const rawStageId = stageIdFromParams || stageIdFromBody;
     const stageId = rawStageId ? String(rawStageId).trim() : '';
 
@@ -642,6 +644,7 @@ export const createTask = async (req: Request, res: Response) => {
       title: title.trim(),
       description: description ? String(description).trim() : null,
       status,
+      tags: Array.isArray(tags) ? tags : undefined,
       dueDate,
       isSprintActive,
       assigneeId,
@@ -661,7 +664,7 @@ export const createTask = async (req: Request, res: Response) => {
 export const updateTask = async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
-    const { status, title, description, stageId, dueDate, isSprintActive, assigneeId } = req.body;
+    const { status, title, description, stageId, tags, dueDate, isSprintActive, assigneeId } = req.body;
 
     if (status !== undefined && !VALID_STATUSES.includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
@@ -675,6 +678,7 @@ export const updateTask = async (req: Request, res: Response) => {
       title,
       description,
       stageId,
+      tags: Array.isArray(tags) ? tags : undefined,
       dueDate,
       isSprintActive,
       assigneeId,

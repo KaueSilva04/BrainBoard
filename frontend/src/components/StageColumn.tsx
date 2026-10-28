@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Layers, Plus, Milestone, Trash2 } from 'lucide-react';
 import type { Stage, Task, TaskStatus, ProjectCollaborator } from '../types';
-import { STAGE_STATUS_LABELS, STAGE_STATUS_COLORS } from '../types';
+import { STAGE_STATUS_LABELS, STAGE_STATUS_COLORS, TASK_STATUS_LABELS, getTaskTags, getTagBadgeClasses } from '../types';
 import { TaskCard } from './TaskCard';
 
 export interface StageColumnProps {
@@ -11,6 +11,7 @@ export interface StageColumnProps {
   collaborators?: ProjectCollaborator[];
   onMoveTask: (id: string, status: TaskStatus) => Promise<void>;
   onMoveTaskToStage?: (taskId: string, targetStageId: string) => Promise<void>;
+  onUpdateTaskTags?: (taskId: string, tags: string[]) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
   onDeleteStage?: (stageId: string, stageTitle: string) => Promise<void>;
   onAddSubtask: (taskId: string, title: string) => Promise<void>;
@@ -26,6 +27,7 @@ export const StageColumn: React.FC<StageColumnProps> = ({
   collaborators,
   onMoveTask,
   onMoveTaskToStage,
+  onUpdateTaskTags,
   onDeleteTask,
   onDeleteStage,
   onAddSubtask,
@@ -34,6 +36,24 @@ export const StageColumn: React.FC<StageColumnProps> = ({
   onOpenCreateTaskForStage,
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
+  const [stageStatusFilter, setStageStatusFilter] = useState<TaskStatus | 'ALL'>('ALL');
+  const [stageTagFilter, setStageTagFilter] = useState<string>('ALL');
+
+  const stageHashtags = useMemo(() => {
+    const tagSet = new Set<string>();
+    tasks.forEach((t) => {
+      getTaskTags(t).forEach((tag) => tagSet.add(tag));
+    });
+    return Array.from(tagSet).sort();
+  }, [tasks]);
+
+  const displayedTasks = useMemo(() => {
+    return tasks.filter((t) => {
+      if (stageStatusFilter !== 'ALL' && t.status !== stageStatusFilter) return false;
+      if (stageTagFilter !== 'ALL' && !getTaskTags(t).includes(stageTagFilter)) return false;
+      return true;
+    });
+  }, [tasks, stageStatusFilter, stageTagFilter]);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -100,23 +120,81 @@ export const StageColumn: React.FC<StageColumnProps> = ({
         </div>
       </div>
 
+      {/* Per-Stage Quick Filter Pills (Status + #tags) */}
+      {tasks.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200/60 bg-slate-50/60 px-4 py-2 dark:border-slate-800/60 dark:bg-slate-900/40">
+          {(['ALL', 'TODO', 'IN_PROGRESS', 'DONE'] as const).map((st) => {
+            const count = st === 'ALL' ? tasks.length : tasks.filter((t) => t.status === st).length;
+            const isSelected = stageStatusFilter === st;
+            const label = st === 'ALL' ? 'Todas' : st === 'IN_PROGRESS' ? 'Andamento' : TASK_STATUS_LABELS[st];
+            return (
+              <button
+                key={st}
+                type="button"
+                onClick={() => setStageStatusFilter(isSelected && st !== 'ALL' ? 'ALL' : st)}
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+                  isSelected
+                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                }`}
+              >
+                <span>{label}</span>
+                <span className="bb-tabular font-mono opacity-75">{count}</span>
+              </button>
+            );
+          })}
+          {stageHashtags.map((tag) => {
+            const isTagActive = stageTagFilter === tag;
+            return (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setStageTagFilter(isTagActive ? 'ALL' : tag)}
+                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-all ${
+                  isTagActive
+                    ? 'bg-indigo-600 text-white border-indigo-600 dark:bg-indigo-500'
+                    : getTagBadgeClasses(tag)
+                }`}
+              >
+                {tag}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Cards List / Container */}
       <div className="flex-1 space-y-3 p-3 sm:p-4">
-        {tasks.length === 0 ? (
+        {displayedTasks.length === 0 ? (
           <div className="h-44 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl flex flex-col items-center justify-center text-slate-400 dark:text-slate-400 p-4 text-center">
             <Layers className="w-7 h-7 mb-2 opacity-40 text-slate-400 dark:text-slate-400" />
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Nenhuma tarefa nesta etapa</p>
-            <button
-              type="button"
-              onClick={() => onOpenCreateTaskForStage(stage.id)}
-              className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Criar tarefa</span>
-            </button>
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              {tasks.length === 0 ? 'Nenhuma tarefa nesta etapa' : 'Nenhuma tarefa neste filtro'}
+            </p>
+            {tasks.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => onOpenCreateTaskForStage(stage.id)}
+                className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Criar tarefa</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setStageStatusFilter('ALL');
+                  setStageTagFilter('ALL');
+                }}
+                className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
+              >
+                <span>Limpar filtro da etapa</span>
+              </button>
+            )}
           </div>
         ) : (
-          tasks.map((task) => (
+          displayedTasks.map((task) => (
             <TaskCard
               key={task.id}
               task={task}
@@ -125,6 +203,7 @@ export const StageColumn: React.FC<StageColumnProps> = ({
               collaborators={collaborators}
               onMoveTask={onMoveTask}
               onMoveTaskToStage={onMoveTaskToStage}
+              onUpdateTaskTags={onUpdateTaskTags}
               onDeleteTask={onDeleteTask}
               onAddSubtask={onAddSubtask}
               onToggleSubtask={onToggleSubtask}

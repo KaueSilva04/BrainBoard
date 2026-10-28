@@ -336,6 +336,27 @@ const AppContent: React.FC = () => {
     }
   };
 
+  const handleUpdateTaskTags = async (taskId: string, tags: string[]) => {
+    if (!activeProject) return;
+    const prevProject = activeProject;
+
+    setActiveProject({
+      ...activeProject,
+      stages: activeProject.stages.map((stage) => ({
+        ...stage,
+        tasks: stage.tasks.map((t) => (t.id === taskId ? { ...t, tags } : t)),
+      })),
+    });
+
+    try {
+      await tasksApi.update(taskId, { tags });
+    } catch (err) {
+      console.error('Failed to update task tags:', err);
+      setActiveProject(prevProject);
+      throw err;
+    }
+  };
+
   const handleDeleteTask = async (id: string) => {
     if (!activeProject) return;
     const prevProject = activeProject;
@@ -572,6 +593,7 @@ const AppContent: React.FC = () => {
               searchQuery={searchQuery}
               onMoveTask={handleMoveTask}
               onMoveTaskToStage={handleMoveTaskToStage}
+              onUpdateTaskTags={handleUpdateTaskTags}
               onDeleteTask={handleDeleteTask}
               onDeleteStage={handleDeleteStage}
               onAddSubtask={handleAddSubtask}

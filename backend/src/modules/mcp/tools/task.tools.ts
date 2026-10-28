@@ -59,6 +59,7 @@ export const taskToolSchemas: Tool[] = [
         title: { type: 'string', description: 'Título da tarefa.' },
         description: { type: 'string', description: 'Descrição detalhada da tarefa.' },
         status: { type: 'string', enum: ['TODO', 'IN_PROGRESS', 'DONE'], description: 'Status inicial.' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Lista de etiquetas/tags para classificar a tarefa (ex: ["Bug", "Frontend"]).' },
         isSprintActive: { type: 'boolean', description: 'Se a tarefa deve ser incluída na Sprint atual ativa.' },
         assigneeId: { type: 'string', description: 'ID opcional do usuário colaborador/proprietário responsável pela tarefa.' },
       },
@@ -75,6 +76,7 @@ export const taskToolSchemas: Tool[] = [
         title: { type: 'string', description: 'Título da tarefa.' },
         description: { type: 'string', description: 'Descrição detalhada da tarefa.' },
         status: { type: 'string', enum: ['TODO', 'IN_PROGRESS', 'DONE'], description: 'Status inicial.' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Lista de etiquetas/tags para classificar a tarefa (ex: ["Bug", "Frontend"]).' },
         isSprintActive: { type: 'boolean', description: 'Se a tarefa deve ser incluída na Sprint atual ativa.' },
         assigneeId: { type: 'string', description: 'ID opcional do usuário colaborador/proprietário responsável pela tarefa.' },
       },
@@ -83,20 +85,20 @@ export const taskToolSchemas: Tool[] = [
   },
   {
     name: 'move_task',
-    description: 'Altera o status de uma tarefa ou a reatribui a outra etapa.',
+    description: 'Altera o status de uma tarefa e/ou a move para outra etapa (stageId).',
     inputSchema: {
       type: 'object',
       properties: {
         id: { type: 'string', description: 'ID da tarefa a mover.' },
-        status: { type: 'string', enum: ['TODO', 'IN_PROGRESS', 'DONE'], description: 'Novo status.' },
+        status: { type: 'string', enum: ['TODO', 'IN_PROGRESS', 'DONE'], description: 'Novo status (opcional se estiver apenas mudando de etapa).' },
         stageId: { type: 'string', description: 'ID opcional do novo Stage se estiver movendo entre etapas.' },
       },
-      required: ['id', 'status'],
+      required: ['id'],
     },
   },
   {
     name: 'update_task_status',
-    description: 'Alias de move_task para alterar o status de uma tarefa.',
+    description: 'Alias de move_task para alterar o status e/ou etapa de uma tarefa.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -104,7 +106,7 @@ export const taskToolSchemas: Tool[] = [
         status: { type: 'string', enum: ['TODO', 'IN_PROGRESS', 'DONE'], description: 'Novo status.' },
         stageId: { type: 'string', description: 'ID opcional da nova etapa.' },
       },
-      required: ['id', 'status'],
+      required: ['id'],
     },
   },
   {
@@ -142,6 +144,7 @@ export const taskToolSchemas: Tool[] = [
         description: { type: 'string', description: 'Nova descrição da tarefa.' },
         status: { type: 'string', enum: ['TODO', 'IN_PROGRESS', 'DONE'], description: 'Novo status.' },
         stageId: { type: 'string', description: 'ID da nova etapa.' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Lista de etiquetas/tags da tarefa.' },
         isSprintActive: { type: 'boolean', description: 'Adicionar ou remover da Sprint ativa.' },
         assigneeId: { type: 'string', description: 'ID do colaborador/proprietário responsável (ou string vazia para desatribuir).' },
       },
@@ -172,13 +175,14 @@ export const taskToolSchemas: Tool[] = [
   },
   {
     name: 'list_tasks',
-    description: 'Lista tarefas com filtros opcionais de etapa (stageId) e status.',
+    description: 'Lista tarefas com filtros opcionais de etapa (stageId), projeto (projectId), status e etiqueta (tag).',
     inputSchema: {
       type: 'object',
       properties: {
         stageId: { type: 'string', description: 'Filtrar por ID da etapa.' },
         projectId: { type: 'string', description: 'Filtrar tarefas pelo ID do projeto.' },
         status: { type: 'string', enum: ['TODO', 'IN_PROGRESS', 'DONE'] },
+        tag: { type: 'string', description: 'Filtrar por etiqueta/tag (ex: "Bug", "Frontend").' },
         isSprintActive: { type: 'boolean', description: 'Listar apenas tarefas que estão na Sprint Semanal (true) ou apenas as que não estão (false).' },
       },
     },
@@ -215,6 +219,7 @@ export async function handleTaskTools(name: string, args: any, userId?: string) 
       title,
       description: args?.description ? String(args.description).trim() : null,
       status: args?.status,
+      tags: Array.isArray(args?.tags) ? args.tags.map((t: any) => String(t).trim()).filter(Boolean) : undefined,
       isSprintActive: args?.isSprintActive !== undefined ? Boolean(args.isSprintActive) : undefined,
       assigneeId: args?.assigneeId ? String(args.assigneeId).trim() : undefined,
     });
@@ -226,11 +231,11 @@ export async function handleTaskTools(name: string, args: any, userId?: string) 
 
   if (name === 'move_task' || name === 'update_task_status') {
     const id = String(args?.id ?? '').trim();
-    const status = args?.status;
+    const status = args?.status ? String(args.status).trim() : undefined;
     const stageId = args?.stageId ? String(args.stageId).trim() : undefined;
 
-    if (!id || !status) {
-      throw new Error('id e status são obrigatórios');
+    if (!id || (!status && !stageId)) {
+      throw new Error('id e pelo menos status ou stageId são obrigatórios');
     }
 
     await assertTaskAccess(id, userId);
@@ -239,12 +244,12 @@ export async function handleTaskTools(name: string, args: any, userId?: string) 
     }
 
     const task = await taskService.updateTask(id, {
-      status,
-      stageId,
+      ...(status ? { status } : {}),
+      ...(stageId ? { stageId } : {}),
     });
 
     return {
-      content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: `Tarefa movida para ${task.status}.`, id: task.id, task }, null, 2) }],
+      content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: `Tarefa movida com sucesso (status: ${task.status}, stageId: ${task.stageId}).`, id: task.id, task }, null, 2) }],
     };
   }
 
@@ -302,6 +307,7 @@ export async function handleTaskTools(name: string, args: any, userId?: string) 
       description: args?.description !== undefined ? (args.description ? String(args.description).trim() : null) : undefined,
       status: args?.status,
       stageId: args?.stageId ? String(args.stageId).trim() : undefined,
+      tags: Array.isArray(args?.tags) ? args.tags.map((t: any) => String(t).trim()).filter(Boolean) : undefined,
       isSprintActive: args?.isSprintActive !== undefined ? Boolean(args.isSprintActive) : undefined,
       assigneeId: args?.assigneeId !== undefined ? (args.assigneeId ? String(args.assigneeId).trim() : null) : undefined,
     });
@@ -352,6 +358,7 @@ export async function handleTaskTools(name: string, args: any, userId?: string) 
       await assertProjectAccess(filters.projectId, userId);
     }
     if (args?.status) filters.status = args.status;
+    if (args?.tag) filters.tag = String(args.tag).trim();
     if (args?.isSprintActive !== undefined) filters.isSprintActive = Boolean(args.isSprintActive);
     if (userId) filters.userId = userId;
 

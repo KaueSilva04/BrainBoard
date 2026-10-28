@@ -49,6 +49,10 @@ export class TaskService {
       where.dueDate = { not: null };
     }
 
+    if (filters?.tag && filters.tag.trim()) {
+      where.tags = { has: filters.tag.trim().replace(/^#/, '') };
+    }
+
     if (filters?.userId && !filters.projectId) {
       where.stage = {
         ...where.stage,
@@ -125,6 +129,9 @@ export class TaskService {
     }
 
     const isSprintActive = data.isSprintActive !== undefined ? Boolean(data.isSprintActive) : false;
+    const tags = Array.isArray(data.tags)
+      ? Array.from(new Set(data.tags.map((t) => String(t).trim()).filter(Boolean)))
+      : [];
 
     let assigneeId: string | null = null;
     if (data.assigneeId) {
@@ -144,6 +151,7 @@ export class TaskService {
             ? String(data.description).trim()
             : null,
         status,
+        tags,
         dueDate,
         isSprintActive,
         assigneeId,
@@ -175,6 +183,7 @@ export class TaskService {
       title?: string;
       description?: string | null;
       stageId?: string;
+      tags?: string[];
       dueDate?: Date | null;
       isSprintActive?: boolean;
       assigneeId?: string | null;
@@ -244,6 +253,12 @@ export class TaskService {
 
     if (data.isSprintActive !== undefined) {
       updateData.isSprintActive = Boolean(data.isSprintActive);
+    }
+
+    if (data.tags !== undefined && Array.isArray(data.tags)) {
+      updateData.tags = Array.from(
+        new Set(data.tags.map((t) => String(t).trim()).filter(Boolean))
+      );
     }
 
     try {
