@@ -17,10 +17,12 @@ import {
   Milestone,
   Tag,
   X,
+  Pencil,
 } from 'lucide-react';
 import type { Task, TaskStatus, Stage, ProjectCollaborator, AuthUser } from '../types';
 import { TASK_STATUS_LABELS, PRESET_TASK_TAGS, getTagBadgeClasses, getTaskTags } from '../types';
 import { SubtaskItem } from './SubtaskItem';
+import { TaskDetailModal } from './TaskDetailModal';
 import { tasksApi } from '../services/api';
 import { getInitials } from './collaborators/AvatarStack';
 
@@ -37,6 +39,7 @@ export interface TaskCardProps {
   onToggleSubtask: (id: string, isDone: boolean) => Promise<void>;
   onDeleteSubtask?: (id: string) => Promise<void>;
   onToggleSprint?: (id: string, isSprintActive: boolean) => Promise<void>;
+  onTaskUpdated?: (updatedTask: Task) => void;
 }
 
 export const TaskCard: React.FC<TaskCardProps> = ({
@@ -52,7 +55,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onToggleSubtask,
   onDeleteSubtask,
   onToggleSprint,
+  onTaskUpdated,
 }) => {
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [subtaskTitle, setSubtaskTitle] = useState('');
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
@@ -384,28 +389,53 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           </div>
         </div>
 
-        {/* Delete button (Trash2 / onDeleteTask) */}
-        <button
-          onClick={handleDelete}
-          disabled={isDeleting}
-          aria-label="Excluir tarefa"
-          className="rounded-lg p-1.5 text-slate-400 dark:text-slate-400 transition-colors hover:bg-rose-50 dark:hover:bg-rose-950/50 hover:text-rose-500 dark:hover:text-rose-400"
-        >
-          {isDeleting ? (
-            <Loader2 className="w-4 h-4 animate-spin text-slate-400 dark:text-slate-400" />
-          ) : (
-            <Trash2 className="w-4 h-4" />
-          )}
-        </button>
+        <div className="flex items-center gap-1">
+          {/* Edit details button */}
+          <button
+            type="button"
+            onClick={() => setIsDetailOpen(true)}
+            aria-label="Editar tarefa"
+            title="Editar tarefa"
+            className="rounded-lg p-1.5 text-slate-400 dark:text-slate-400 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Delete button (Trash2 / onDeleteTask) */}
+          <button
+            onClick={handleDelete}
+            disabled={isDeleting}
+            aria-label="Excluir tarefa"
+            className="rounded-lg p-1.5 text-slate-400 dark:text-slate-400 transition-colors hover:bg-rose-50 dark:hover:bg-rose-950/50 hover:text-rose-500 dark:hover:text-rose-400"
+          >
+            {isDeleting ? (
+              <Loader2 className="w-4 h-4 animate-spin text-slate-400 dark:text-slate-400" />
+            ) : (
+              <Trash2 className="w-4 h-4" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Task Title & Description */}
-      <div>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setIsDetailOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsDetailOpen(true);
+          }
+        }}
+        title="Clique para visualizar e editar detalhes da tarefa"
+        className="cursor-pointer group/title focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-lg -m-1 p-1 transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/40"
+      >
         <h4
           className={`text-base font-semibold leading-snug tracking-tight transition-colors ${
             task.status === 'DONE'
               ? 'text-slate-400 dark:text-slate-400 line-through font-normal'
-              : 'text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
+              : 'text-slate-900 dark:text-slate-100 group-hover/title:text-indigo-600 dark:group-hover/title:text-indigo-400'
           }`}
         >
           {task.title}
@@ -727,6 +757,21 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           </button>
         )}
       </div>
+
+      <TaskDetailModal
+        isOpen={isDetailOpen}
+        onClose={() => setIsDetailOpen(false)}
+        task={task}
+        stages={stages}
+        collaborators={collaborators}
+        onTaskUpdated={(updatedTask) => {
+          setTags(getTaskTags(updatedTask));
+          setIsSprintActive(Boolean(updatedTask.isSprintActive));
+          setAssignee(updatedTask.assignee);
+          onTaskUpdated?.(updatedTask);
+        }}
+        onDeleteTask={onDeleteTask}
+      />
     </div>
   );
 };

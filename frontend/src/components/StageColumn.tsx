@@ -18,6 +18,7 @@ export interface StageColumnProps {
   onToggleSubtask: (id: string, isDone: boolean) => Promise<void>;
   onDeleteSubtask?: (id: string) => Promise<void>;
   onOpenCreateTaskForStage: (stageId: string) => void;
+  onTaskUpdated?: (updatedTask: Task) => void;
 }
 
 export const StageColumn: React.FC<StageColumnProps> = ({
@@ -34,6 +35,7 @@ export const StageColumn: React.FC<StageColumnProps> = ({
   onToggleSubtask,
   onDeleteSubtask,
   onOpenCreateTaskForStage,
+  onTaskUpdated,
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [stageStatusFilter, setStageStatusFilter] = useState<TaskStatus | 'ALL'>('ALL');
@@ -208,6 +210,7 @@ export const StageColumn: React.FC<StageColumnProps> = ({
               onAddSubtask={onAddSubtask}
               onToggleSubtask={onToggleSubtask}
               onDeleteSubtask={onDeleteSubtask}
+              onTaskUpdated={onTaskUpdated}
             />
           ))
         )}

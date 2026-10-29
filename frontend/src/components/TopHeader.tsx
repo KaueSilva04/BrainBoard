@@ -1,8 +1,9 @@
 import React from 'react';
-import { Search, Plus, FolderKanban, RefreshCw, X, Moon, Sun, ArrowLeft, Users } from 'lucide-react';
+import { Search, Plus, FolderKanban, RefreshCw, X, Moon, Sun, ArrowLeft, Users, KeyRound } from 'lucide-react';
 import type { Project, ProjectSummary, ActiveView, ProjectCollaborator } from '../types';
 import type { Theme } from '../hooks/useTheme';
 import { AvatarStack } from './collaborators/AvatarStack';
+import { McpTokenModal } from './McpTokenModal';
 
 export interface TopHeaderProps {
   theme: Theme;
@@ -43,6 +44,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onOpenCollaboratorsModal,
 }) => {
   const searchInputRef = React.useRef<HTMLInputElement>(null);
+  const [isMcpModalOpen, setIsMcpModalOpen] = React.useState(false);
 
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -195,6 +197,17 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             </button>
           )}
 
+          <button
+            type="button"
+            onClick={() => setIsMcpModalOpen(true)}
+            aria-label="Token e Conexão MCP"
+            title="Token e Conexão MCP (Codex / IA)"
+            className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            <KeyRound className="h-4 w-4 text-indigo-500 dark:text-indigo-400" />
+            <span className="hidden sm:inline">Token MCP</span>
+          </button>
+
           {action && (
             <button
               type="button"
@@ -207,6 +220,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           )}
         </div>
       </div>
+      <McpTokenModal isOpen={isMcpModalOpen} onClose={() => setIsMcpModalOpen(false)} />
     </header>
   );
 };

@@ -15,10 +15,12 @@ import {
   ArrowRight,
   ArrowLeft,
   CheckSquare,
+  Pencil,
 } from 'lucide-react';
 import { tasksApi } from '../../services/api';
-import type { Task, TaskStatus } from '../../types';
+import type { Task, TaskStatus, Stage } from '../../types';
 import { AddToSprintModal } from './AddToSprintModal';
+import { TaskDetailModal } from '../TaskDetailModal';
 import { SubtaskItem } from '../SubtaskItem';
 import { getInitials } from '../collaborators/AvatarStack';
 
@@ -52,6 +54,17 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({
   const [removingTaskId, setRemovingTaskId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<TaskStatus | null>(null);
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
+  const [selectedTaskForDetail, setSelectedTaskForDetail] = useState<Task | null>(null);
+
+  const sprintStages = useMemo(() => {
+    const stageMap = new Map<string, Stage>();
+    tasks.forEach((t) => {
+      if (t.stage) {
+        stageMap.set(t.stage.id, t.stage);
+      }
+    });
+    return Array.from(stageMap.values());
+  }, [tasks]);
 
   // Subtask management inline state
   const [activeSubtaskFormId, setActiveSubtaskFormId] = useState<string | null>(null);
@@ -598,28 +611,52 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({
                               )}
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveFromSprint(task.id)}
-                              disabled={isRemoving}
-                              title="Remover do foco"
-                              className="text-slate-400 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 p-1 rounded-lg transition-colors"
-                            >
-                              {isRemoving ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <MinusCircle className="w-3.5 h-3.5" />
-                              )}
-                            </button>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedTaskForDetail(task)}
+                                title="Editar tarefa"
+                                aria-label="Editar tarefa"
+                                className="text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 p-1 rounded-lg transition-colors"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFromSprint(task.id)}
+                                disabled={isRemoving}
+                                title="Remover do foco"
+                                className="text-slate-400 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 p-1 rounded-lg transition-colors"
+                              >
+                                {isRemoving ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <MinusCircle className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            </div>
                           </div>
 
                           {/* Task Title & Description */}
-                          <div>
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setSelectedTaskForDetail(task)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setSelectedTaskForDetail(task);
+                              }
+                            }}
+                            title="Clique para visualizar e editar detalhes da tarefa"
+                            className="cursor-pointer group/title focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-lg -m-1 p-1 transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/40"
+                          >
                             <h4
-                              className={`text-sm font-bold leading-snug ${
+                              className={`text-sm font-bold leading-snug transition-colors ${
                                 task.status === 'DONE'
                                   ? 'text-slate-400 dark:text-slate-400 line-through font-normal'
-                                  : 'text-slate-900 dark:text-slate-100'
+                                  : 'text-slate-900 dark:text-slate-100 group-hover/title:text-indigo-600 dark:group-hover/title:text-indigo-400'
                               }`}
                             >
                               {task.title}
@@ -803,6 +840,28 @@ export const SprintKanbanView: React.FC<SprintKanbanViewProps> = ({
         isOpen={isAddToSprintOpen}
         onClose={() => setIsAddToSprintOpen(false)}
         onTaskAdded={() => loadSprintTasks(true)}
+      />
+
+      {/* Task Detail Modal */}
+      <TaskDetailModal
+        isOpen={Boolean(selectedTaskForDetail)}
+        onClose={() => setSelectedTaskForDetail(null)}
+        task={selectedTaskForDetail}
+        stages={sprintStages}
+        onTaskUpdated={(updatedTask) => {
+          setSelectedTaskForDetail(null);
+          if (!updatedTask.isSprintActive) {
+            setTasks((prev) => prev.filter((t) => t.id !== updatedTask.id));
+          } else {
+            setTasks((prev) =>
+              prev.map((t) => (t.id === updatedTask.id ? { ...t, ...updatedTask } : t))
+            );
+          }
+        }}
+        onDeleteTask={async (taskId) => {
+          await tasksApi.delete(taskId);
+          setTasks((prev) => prev.filter((t) => t.id !== taskId));
+        }}
       />
     </div>
   );

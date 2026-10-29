@@ -357,6 +357,37 @@ const AppContent: React.FC = () => {
     }
   };
 
+  const handleTaskUpdated = (updatedTask: Task) => {
+    if (!activeProject) return;
+    setActiveProject((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        stages: prev.stages.map((stage) => {
+          const hadTask = stage.tasks.some((t) => t.id === updatedTask.id);
+          const targetStageId = updatedTask.stageId || stage.id;
+          const shouldHaveTask = stage.id === targetStageId;
+          if (hadTask && !shouldHaveTask) {
+            return { ...stage, tasks: stage.tasks.filter((t) => t.id !== updatedTask.id) };
+          }
+          if (shouldHaveTask) {
+            if (hadTask) {
+              return {
+                ...stage,
+                tasks: stage.tasks.map((t) => (t.id === updatedTask.id ? { ...t, ...updatedTask } : t)),
+              };
+            }
+            return {
+              ...stage,
+              tasks: [...stage.tasks, updatedTask],
+            };
+          }
+          return stage;
+        }),
+      };
+    });
+  };
+
   const handleDeleteTask = async (id: string) => {
     if (!activeProject) return;
     const prevProject = activeProject;
@@ -602,6 +633,7 @@ const AppContent: React.FC = () => {
               onOpenCreateTask={handleOpenCreateTask}
               onOpenCreateStage={() => setIsCreateStageModalOpen(true)}
               onOpenCreateModal={() => handleOpenCreateTask()}
+              onTaskUpdated={handleTaskUpdated}
             />
           )}
         </main>
