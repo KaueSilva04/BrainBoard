@@ -17,6 +17,7 @@ export interface KanbanColumnProps {
   onToggleSubtask: (id: string, isDone: boolean) => Promise<void>;
   onDeleteSubtask?: (id: string) => Promise<void>;
   onOpenCreateTask?: () => void;
+  onTaskUpdated?: (updatedTask: Task) => void;
 }
 
 export const KanbanColumn: React.FC<KanbanColumnProps> = ({
@@ -31,6 +32,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   onAddSubtask,
   onToggleSubtask,
   onDeleteSubtask,
+  onTaskUpdated,
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -128,6 +130,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
               onAddSubtask={onAddSubtask}
               onToggleSubtask={onToggleSubtask}
               onDeleteSubtask={onDeleteSubtask}
+              onTaskUpdated={onTaskUpdated}
             />
           ))
         )}

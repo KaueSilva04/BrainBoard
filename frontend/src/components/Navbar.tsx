@@ -14,14 +14,11 @@ import {
   Gauge,
   LogOut,
   KeyRound,
-  Check,
-  Copy,
 } from 'lucide-react';
-import { createPortal } from 'react-dom';
 import type { ProjectSummary, ActiveView } from '../types';
 import { getProjectCover } from '../utils/projectCover';
 import { useAuth } from '../context/AuthContext';
-import { authApi } from '../services/api';
+import { McpTokenModal } from './McpTokenModal';
 
 export interface NavbarProps {
   currentView?: ActiveView;
@@ -52,41 +49,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { user, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMcpModalOpen, setIsMcpModalOpen] = useState(false);
-  const [mcpToken, setMcpToken] = useState<string>('');
-  const [mcpExpiresIn, setMcpExpiresIn] = useState<string>('365d');
-  const [loadingMcpToken, setLoadingMcpToken] = useState(false);
-  const [copiedField, setCopiedField] = useState<string | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
-
-  const openMcpModal = async () => {
-    setIsMcpModalOpen(true);
-    setLoadingMcpToken(true);
-    try {
-      const res = await authApi.mcpToken();
-      setMcpToken(res.token);
-      setMcpExpiresIn(res.expiresIn || '365d');
-    } catch {
-      const stored = localStorage.getItem('brainboard_token') || localStorage.getItem('brainboard_auth_token') || '';
-      setMcpToken(stored);
-    } finally {
-      setLoadingMcpToken(false);
-    }
-  };
-
-  const mcpBaseUrl = typeof window !== 'undefined'
-    ? ((import.meta.env.VITE_API_URL as string | undefined) || window.location.origin).replace(/\/$/, '')
-    : '';
-
-  const copyText = async (value: string, label: string) => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopiedField(label);
-      setTimeout(() => setCopiedField(null), 2000);
-    } catch {
-      // ignore clipboard errors
-    }
-  };
 
   useEffect(() => {
     if (!isMobileMenuOpen) return;
@@ -326,7 +290,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="flex shrink-0 items-center gap-1">
             <button
               type="button"
-              onClick={openMcpModal}
+              onClick={() => setIsMcpModalOpen(true)}
               title="Token e Conexão MCP (365 dias)"
               aria-label="Token e Conexão MCP"
               className="inline-flex h-7 w-7 items-center justify-center rounded-md text-indigo-200/80 hover:bg-white/10 hover:text-white dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
@@ -417,99 +381,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       )}
 
-      {isMcpModalOpen &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <div
-            className="bb-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
-            onClick={() => setIsMcpModalOpen(false)}
-          >
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="mcp-token-modal-title"
-              className="bb-dialog-panel relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-4 dark:border-slate-800">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50">
-                    <KeyRound className="h-4.5 w-4.5" />
-                  </div>
-                  <div>
-                    <h2 id="mcp-token-modal-title" className="text-base font-bold text-slate-900 dark:text-slate-100">
-                      Chave de Autenticação & Conexão MCP
-                    </h2>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      Token vinculado a <strong className="font-semibold text-slate-800 dark:text-slate-200">{user?.email}</strong> com validade de <strong className="font-semibold text-slate-800 dark:text-slate-200">{mcpExpiresIn}</strong>.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsMcpModalOpen(false)}
-                  aria-label="Fechar modal MCP"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="mt-4 space-y-4">
-                <div>
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      URL Streamable HTTP (Codex / Antigravity / Cursor)
-                    </span>
-                    <button
-                      type="button"
-                      disabled={!mcpToken || loadingMcpToken}
-                      onClick={() => copyText(`${mcpBaseUrl}/mcp?token=${mcpToken}`, 'url')}
-                      className="inline-flex h-7 items-center gap-1.5 rounded-md bg-slate-900 px-2.5 text-xs font-semibold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-                    >
-                      {copiedField === 'url' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                      {copiedField === 'url' ? 'Copiado' : 'Copiar URL'}
-                    </button>
-                  </div>
-                  <code className="block break-all rounded-xl border border-slate-200 bg-slate-50 p-3 font-mono text-[11px] text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200">
-                    {loadingMcpToken ? 'Gerando token de longa duração...' : `${mcpBaseUrl}/mcp?token=${mcpToken}`}
-                  </code>
-                </div>
-
-                <div>
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Token Bearer (Validade: {mcpExpiresIn})
-                    </span>
-                    <button
-                      type="button"
-                      disabled={!mcpToken || loadingMcpToken}
-                      onClick={() => copyText(mcpToken, 'token')}
-                      className="inline-flex h-7 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-                    >
-                      {copiedField === 'token' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                      {copiedField === 'token' ? 'Copiado' : 'Copiar Token'}
-                    </button>
-                  </div>
-                  <code className="block max-h-24 overflow-y-auto break-all rounded-xl border border-slate-200 bg-slate-50 p-3 font-mono text-[11px] text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
-                    {loadingMcpToken ? 'Carregando...' : mcpToken}
-                  </code>
-                </div>
-              </div>
-
-              <div className="mt-5 flex justify-end border-t border-slate-200 pt-4 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setIsMcpModalOpen(false)}
-                  className="inline-flex h-9 items-center justify-center rounded-lg bg-slate-900 px-4 text-xs font-semibold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-                >
-                  Fechar
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      <McpTokenModal isOpen={isMcpModalOpen} onClose={() => setIsMcpModalOpen(false)} />
     </>
   );
 };

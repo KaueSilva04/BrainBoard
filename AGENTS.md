@@ -3,7 +3,8 @@
 ## Git
 
 - Os agentes têm autorização para executar comandos Git locais necessários ao trabalho no repositório, incluindo consultar o estado e o histórico, criar ou trocar branches, preparar alterações e criar commits.
-- É proibido executar `git push` ou qualquer operação equivalente que envie commits, branches ou tags para um repositório remoto. Deixe a publicação para o usuário.
+- **PROIBIDO `git push`:** É terminantemente proibido executar `git push` ou qualquer operação equivalente que envie commits, branches ou tags para um repositório remoto. Deixe a publicação para o usuário.
+- **COMMIT OBRIGATÓRIO:** Sempre que implementar, corrigir ou finalizar algo relevante, é **necessário realizar um `git commit` local** com mensagem descritiva após validar o build.
 - Preserve as alterações locais já existentes. Não descarte nem sobrescreva trabalho do usuário sem instrução explícita.
 
 ## Execução
