@@ -57,7 +57,13 @@ export const m2ToolSchemas: Tool[] = [
 ];
 
 export async function handleM2Tools(name: string, args: any, userId?: string) {
+  const targetUserId = userId;
+
   if (name === 'create_appointment') {
+    if (!targetUserId) {
+      throw new Error('Usuário não autenticado para criar compromisso via MCP');
+    }
+
     const title = String(args?.title ?? '').trim();
     const startTimeStr = String(args?.startTime ?? '').trim();
     const endTimeStr = String(args?.endTime ?? '').trim();
@@ -70,7 +76,7 @@ export async function handleM2Tools(name: string, args: any, userId?: string) {
     if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) throw new Error('Datas inválidas');
     if (startTime >= endTime) throw new Error('startTime deve ser anterior a endTime');
 
-    const apt = await appointmentService.createAppointment({
+    const apt = await appointmentService.createAppointment(targetUserId, {
       title,
       startTime,
       endTime,
@@ -82,21 +88,25 @@ export async function handleM2Tools(name: string, args: any, userId?: string) {
       content: [
         {
           type: 'text' as const,
-          text: JSON.stringify({ success: true, message: `Compromisso agendado com sucesso.`, id: apt.id, appointment: apt }, null, 2),
+          text: `Compromisso agendado com sucesso: ${apt.id} — "${apt.title}" (${apt.startTime.toISOString()} até ${apt.endTime.toISOString()})`,
         },
       ],
     };
   }
 
   if (name === 'list_upcoming_deadlines') {
+    if (!targetUserId) {
+      throw new Error('Usuário não autenticado para consultar prazos via MCP');
+    }
+
     const days = typeof args?.days === 'number' && args.days > 0 ? args.days : 7;
     const projectId = args?.projectId ? String(args.projectId).trim() : undefined;
     const includeCompleted = Boolean(args?.includeCompleted);
     const now = new Date();
     const futureDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
 
-    if (projectId && userId) {
-      const hasAccess = await collaboratorService.isMemberOrOwner(projectId, userId);
+    if (projectId && targetUserId) {
+      const hasAccess = await collaboratorService.isMemberOrOwner(projectId, targetUserId);
       if (!hasAccess) {
         throw new Error('Acesso negado: você não é proprietário nem colaborador deste projeto');
       }
@@ -108,16 +118,16 @@ export async function handleM2Tools(name: string, args: any, userId?: string) {
         ...(includeCompleted ? {} : { status: { not: 'DONE' } }),
         stage: {
           ...(projectId ? { projectId } : {}),
-          ...(userId
+          ...(targetUserId
             ? {
                 project: {
                   OR: [
-                    { ownerId: userId },
-                    { collaborators: { some: { userId } } },
+                    { ownerId: targetUserId },
+                    { collaborators: { some: { userId: targetUserId } } },
                   ],
                 },
               }
-            : {}),
+            : { project: { ownerId: '__no_access__' } }),
         },
       },
       include: { stage: { include: { project: true } } },
@@ -128,6 +138,7 @@ export async function handleM2Tools(name: string, args: any, userId?: string) {
       where: {
         startTime: { gte: now, lte: futureDate },
         ...(includeCompleted ? {} : { isCompleted: false }),
+        ...(targetUserId ? { userId: targetUserId } : { userId: '__no_access__' }),
       },
       orderBy: { startTime: 'asc' },
     });
@@ -160,19 +171,21 @@ export async function handleM2Tools(name: string, args: any, userId?: string) {
   }
 
   if (name === 'add_to_sprint') {
+    if (!targetUserId) {
+      throw new Error('Usuário não autenticado para modificar Sprint via MCP');
+    }
+
     const taskId = String(args?.taskId ?? '').trim();
     if (!taskId) throw new Error('taskId é obrigatório');
 
-    if (userId) {
-      const existingTask = await prisma.task.findUnique({
-        where: { id: taskId },
-        select: { stage: { select: { projectId: true } } },
-      });
-      if (!existingTask) throw new Error('Tarefa não encontrada');
-      const hasAccess = await collaboratorService.isMemberOrOwner(existingTask.stage.projectId, userId);
-      if (!hasAccess) {
-        throw new Error('Acesso negado: você não é proprietário nem colaborador deste projeto');
-      }
+    const existingTask = await prisma.task.findUnique({
+      where: { id: taskId },
+      select: { stage: { select: { projectId: true } } },
+    });
+    if (!existingTask) throw new Error('Tarefa não encontrada');
+    const hasAccess = await collaboratorService.isMemberOrOwner(existingTask.stage.projectId, targetUserId);
+    if (!hasAccess) {
+      throw new Error('Acesso negado: você não é proprietário nem colaborador deste projeto');
     }
 
     const isSprintActive =

@@ -53,11 +53,15 @@ export const AcademicView: React.FC = () => {
     try {
       const subs = await academicApi.listSubjects();
       setSubjects(subs);
-      if (subs.length > 0 && !activeSubjectId) {
-        setActiveSubjectId(subs[0].id);
+      if (subs.length > 0) {
+        if (!activeSubjectId || !subs.some((s) => s.id === activeSubjectId)) {
+          setActiveSubjectId(subs[0].id);
+        }
+      } else {
+        setActiveSubjectId(null);
       }
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load academic subjects:', err);
       setSubjectsError(true);
     } finally {
       setLoading(false);
@@ -70,8 +74,9 @@ export const AcademicView: React.FC = () => {
     try {
       const data = await academicApi.listAssignments(subjectId);
       setAssignments(data);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error(`Failed to load assignments for subject ${subjectId}:`, err);
+      setAssignments([]);
       setAssignmentsError(true);
     } finally {
       setAssignmentsLoading(false);

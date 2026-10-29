@@ -30,14 +30,23 @@ async function resolveEffectiveUserId(userId?: string): Promise<string | undefin
 export class DashboardService {
   async getOverview(from: Date, to: Date, userId?: string): Promise<DashboardOverviewDto> {
     const effectiveUserId = await resolveEffectiveUserId(userId);
-    const projectWhere: any = effectiveUserId
-      ? {
-          OR: [
-            { ownerId: effectiveUserId },
-            { collaborators: { some: { userId: effectiveUserId } } },
-          ],
-        }
-      : {};
+    if (!effectiveUserId) {
+      return {
+        asOf: new Date().toISOString(),
+        window: { from: from.toISOString(), to: to.toISOString() },
+        projectCounts: { total: 0, planning: 0, active: 0, completed: 0 },
+        projects: [],
+        focusTasks: [],
+        upcomingEvents: [],
+      };
+    }
+
+    const projectWhere: any = {
+      OR: [
+        { ownerId: effectiveUserId },
+        { collaborators: { some: { userId: effectiveUserId } } },
+      ],
+    };
 
     const [projectGroups, projects, focusTasks, calendarEvents] = await Promise.all([
       prisma.project.groupBy({

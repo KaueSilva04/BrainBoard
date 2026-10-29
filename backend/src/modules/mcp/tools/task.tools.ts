@@ -5,7 +5,9 @@ import { prisma } from '../../../prisma.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 async function assertProjectAccess(projectId: string, userId?: string) {
-  if (!userId) return;
+  if (!userId) {
+    throw new Error('Usuário não autenticado para acessar ferramentas de tarefas via MCP');
+  }
   const hasAccess = await collaboratorService.isMemberOrOwner(projectId, userId);
   if (!hasAccess) {
     throw new Error('Acesso negado: você não é proprietário nem colaborador deste projeto');
@@ -13,7 +15,9 @@ async function assertProjectAccess(projectId: string, userId?: string) {
 }
 
 async function assertStageAccess(stageId: string, userId?: string) {
-  if (!userId) return;
+  if (!userId) {
+    throw new Error('Usuário não autenticado para acessar ferramentas de tarefas via MCP');
+  }
   const stage = await prisma.stage.findUnique({
     where: { id: stageId },
     select: { projectId: true },
@@ -25,7 +29,9 @@ async function assertStageAccess(stageId: string, userId?: string) {
 }
 
 async function assertTaskAccess(taskId: string, userId?: string) {
-  if (!userId) return;
+  if (!userId) {
+    throw new Error('Usuário não autenticado para acessar ferramentas de tarefas via MCP');
+  }
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     select: { stage: { select: { projectId: true } } },
@@ -37,7 +43,9 @@ async function assertTaskAccess(taskId: string, userId?: string) {
 }
 
 async function assertSubtaskAccess(subtaskId: string, userId?: string) {
-  if (!userId) return;
+  if (!userId) {
+    throw new Error('Usuário não autenticado para acessar ferramentas de tarefas via MCP');
+  }
   const subtask = await prisma.subtask.findUnique({
     where: { id: subtaskId },
     select: { task: { select: { stage: { select: { projectId: true } } } } },
@@ -200,7 +208,17 @@ export const taskToolSchemas: Tool[] = [
   },
 ];
 
+const TASK_TOOL_NAMES = new Set(taskToolSchemas.map((t) => t.name));
+
 export async function handleTaskTools(name: string, args: any, userId?: string) {
+  if (!TASK_TOOL_NAMES.has(name)) {
+    return null;
+  }
+
+  if (!userId) {
+    throw new Error('Usuário não autenticado para acessar ferramentas de tarefas via MCP');
+  }
+
   if (name === 'create_task' || name === 'add_task') {
     const stageId = String(args?.stageId ?? '').trim();
     const title = String(args?.title ?? '').trim();

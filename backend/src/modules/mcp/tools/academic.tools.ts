@@ -1,6 +1,13 @@
 import { academicService } from '../../academic/academic.service.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
+async function resolveMcpUserId(userId?: string): Promise<string> {
+  if (!userId) {
+    throw new Error('Nenhum usuário autenticado para executar a ferramenta MCP');
+  }
+  return userId;
+}
+
 export const academicToolSchemas: Tool[] = [
   {
     name: 'list_subjects',
@@ -55,9 +62,10 @@ export const academicToolSchemas: Tool[] = [
   },
 ];
 
-export async function handleAcademicTools(name: string, args: any) {
+export async function handleAcademicTools(name: string, args: any, userId?: string) {
   if (name === 'list_subjects') {
-    const subjects = await academicService.listSubjects();
+    const effectiveUserId = await resolveMcpUserId(userId);
+    const subjects = await academicService.listSubjects(effectiveUserId);
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(subjects, null, 2) }],
     };
@@ -67,7 +75,8 @@ export async function handleAcademicTools(name: string, args: any) {
     const title = String(args?.title ?? '').trim();
     if (!title) throw new Error('title é obrigatório');
     
-    const subject = await academicService.createSubject({
+    const effectiveUserId = await resolveMcpUserId(userId);
+    const subject = await academicService.createSubject(effectiveUserId, {
       title,
       ...(args?.description ? { description: String(args.description) } : {}),
       ...(args?.professor ? { professor: String(args.professor) } : {}),
@@ -85,7 +94,8 @@ export async function handleAcademicTools(name: string, args: any) {
     const type = String(args?.type ?? '').trim();
     if (!subjectId || !title || !type) throw new Error('subjectId, title e type são obrigatórios');
 
-    const assignment = await academicService.createAssignment({
+    const effectiveUserId = await resolveMcpUserId(userId);
+    const assignment = await academicService.createAssignment(effectiveUserId, {
       subjectId,
       title,
       type: type as any,
@@ -104,7 +114,8 @@ export async function handleAcademicTools(name: string, args: any) {
     const status = String(args?.status ?? '').trim();
     if (!id || !status) throw new Error('id e status são obrigatórios');
 
-    const assignment = await academicService.updateAssignment(id, { status: status as any });
+    const effectiveUserId = await resolveMcpUserId(userId);
+    const assignment = await academicService.updateAssignment(id, effectiveUserId, { status: status as any });
     return {
       content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: 'Status atualizado com sucesso.', id: assignment.id, status: assignment.status, assignment }, null, 2) }],
     };

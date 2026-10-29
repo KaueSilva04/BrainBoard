@@ -51,7 +51,7 @@ export function createMcpServer(userId?: string): Server {
     const m2Result = await handleM2Tools(name, args, userId);
     if (m2Result) return m2Result;
 
-    const academicResult = await handleAcademicTools(name, args);
+    const academicResult = await handleAcademicTools(name, args, userId);
     if (academicResult) return academicResult;
 
     throw new Error(`Tool unknown: ${name}`);
@@ -74,7 +74,7 @@ export const streamableSessions = new Map<string, StreamableSession>();
 
 export const handleStreamableHttp = async (req: Request, res: Response) => {
   const mcpUser = await resolveMcpUser(req);
-  if (!mcpUser && process.env.REQUIRE_MCP_AUTH === 'true') {
+  if (!mcpUser) {
     res.status(401).json({ error: 'Autenticação necessária para o servidor MCP' });
     return;
   }
@@ -84,6 +84,11 @@ export const handleStreamableHttp = async (req: Request, res: Response) => {
   const sessionId = sessionIdHeader || sessionIdQuery;
 
   let session = sessionId ? streamableSessions.get(sessionId) : null;
+
+  if (session && session.userId && session.userId !== mcpUser.id) {
+    res.status(403).json({ error: 'Acesso negado: a sessão MCP pertence a outro usuário' });
+    return;
+  }
 
   if (!session) {
     const newSessionId = randomUUID();

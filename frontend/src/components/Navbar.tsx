@@ -67,12 +67,16 @@ export const Navbar: React.FC<NavbarProps> = ({
       setMcpToken(res.token);
       setMcpExpiresIn(res.expiresIn || '365d');
     } catch {
-      const stored = localStorage.getItem('brainboard_auth_token') || '';
+      const stored = localStorage.getItem('brainboard_token') || localStorage.getItem('brainboard_auth_token') || '';
       setMcpToken(stored);
     } finally {
       setLoadingMcpToken(false);
     }
   };
+
+  const mcpBaseUrl = typeof window !== 'undefined'
+    ? ((import.meta.env.VITE_API_URL as string | undefined) || window.location.origin).replace(/\/$/, '')
+    : '';
 
   const copyText = async (value: string, label: string) => {
     try {
@@ -424,17 +428,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               role="dialog"
               aria-modal="true"
               aria-labelledby="mcp-token-modal-title"
-              className="bb-modal-panel w-full max-w-lg rounded-2xl p-6"
+              className="bb-dialog-panel relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-4 dark:border-slate-800">
-                <div>
-                  <h2 id="mcp-token-modal-title" className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                    Conexão MCP do Usuário
-                  </h2>
-                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
-                    Token vinculado a <strong>{user?.email}</strong> com validade de <strong>{mcpExpiresIn}</strong> (acessa apenas projetos onde você é proprietário ou colaborador).
-                  </p>
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50">
+                    <KeyRound className="h-4.5 w-4.5" />
+                  </div>
+                  <div>
+                    <h2 id="mcp-token-modal-title" className="text-base font-bold text-slate-900 dark:text-slate-100">
+                      Chave de Autenticação & Conexão MCP
+                    </h2>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      Token vinculado a <strong className="font-semibold text-slate-800 dark:text-slate-200">{user?.email}</strong> com validade de <strong className="font-semibold text-slate-800 dark:text-slate-200">{mcpExpiresIn}</strong>.
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -455,15 +464,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <button
                       type="button"
                       disabled={!mcpToken || loadingMcpToken}
-                      onClick={() => copyText(`${window.location.origin}/mcp?token=${mcpToken}`, 'url')}
+                      onClick={() => copyText(`${mcpBaseUrl}/mcp?token=${mcpToken}`, 'url')}
                       className="inline-flex h-7 items-center gap-1.5 rounded-md bg-slate-900 px-2.5 text-xs font-semibold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
                     >
                       {copiedField === 'url' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                       {copiedField === 'url' ? 'Copiado' : 'Copiar URL'}
                     </button>
                   </div>
-                  <code className="block break-all rounded-lg border border-slate-200 bg-slate-50 p-2.5 font-mono text-[11px] text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
-                    {loadingMcpToken ? 'Gerando token de longa duração...' : `${window.location.origin}/mcp?token=${mcpToken}`}
+                  <code className="block break-all rounded-xl border border-slate-200 bg-slate-50 p-3 font-mono text-[11px] text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200">
+                    {loadingMcpToken ? 'Gerando token de longa duração...' : `${mcpBaseUrl}/mcp?token=${mcpToken}`}
                   </code>
                 </div>
 
@@ -482,7 +491,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       {copiedField === 'token' ? 'Copiado' : 'Copiar Token'}
                     </button>
                   </div>
-                  <code className="block max-h-24 overflow-y-auto break-all rounded-lg border border-slate-200 bg-slate-50 p-2.5 font-mono text-[11px] text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                  <code className="block max-h-24 overflow-y-auto break-all rounded-xl border border-slate-200 bg-slate-50 p-3 font-mono text-[11px] text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
                     {loadingMcpToken ? 'Carregando...' : mcpToken}
                   </code>
                 </div>

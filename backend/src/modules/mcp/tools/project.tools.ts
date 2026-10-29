@@ -191,7 +191,17 @@ export const projectToolSchemas: Tool[] = [
   },
 ];
 
+const PROJECT_TOOL_NAMES = new Set(projectToolSchemas.map((t) => t.name));
+
 export async function handleProjectTools(name: string, args: any, userId?: string) {
+  if (!PROJECT_TOOL_NAMES.has(name)) {
+    return null;
+  }
+
+  if (!userId) {
+    throw new Error('Usuário não autenticado para acessar ferramentas de projetos via MCP');
+  }
+
   if (name === 'list_projects') {
     const projects = await projectService.listProjects({ userId });
     const mapped = projects.map(p => ({
@@ -228,11 +238,9 @@ export async function handleProjectTools(name: string, args: any, userId?: strin
     const title = String(args?.title ?? '').trim();
     if (!projectId || !title) throw new Error('projectId e title são obrigatórios');
 
-    if (userId) {
-      const hasAccess = await collaboratorService.isMemberOrOwner(projectId, userId);
-      if (!hasAccess) {
-        throw new Error('Acesso negado: você não é proprietário nem colaborador deste projeto');
-      }
+    const hasAccess = await collaboratorService.isMemberOrOwner(projectId, userId);
+    if (!hasAccess) {
+      throw new Error('Acesso negado: você não é proprietário nem colaborador deste projeto');
     }
 
     const stage = await stageService.createStage({
@@ -254,11 +262,9 @@ export async function handleProjectTools(name: string, args: any, userId?: strin
       throw new Error(`Etapa não encontrada para o ID: ${stageId}`);
     }
 
-    if (userId) {
-      const hasAccess = await collaboratorService.isMemberOrOwner(existingStage.projectId, userId);
-      if (!hasAccess) {
-        throw new Error('Acesso negado: você não é proprietário nem colaborador deste projeto');
-      }
+    const hasAccess = await collaboratorService.isMemberOrOwner(existingStage.projectId, userId);
+    if (!hasAccess) {
+      throw new Error('Acesso negado: você não é proprietário nem colaborador deste projeto');
     }
 
     const updated = await stageService.updateStage(stageId, {
@@ -286,11 +292,9 @@ export async function handleProjectTools(name: string, args: any, userId?: strin
       throw new Error(`Etapa não encontrada para o ID: ${stageId}`);
     }
 
-    if (userId) {
-      const hasAccess = await collaboratorService.isMemberOrOwner(existingStage.projectId, userId);
-      if (!hasAccess) {
-        throw new Error('Acesso negado: você não é proprietário nem colaborador deste projeto');
-      }
+    const hasAccess = await collaboratorService.isMemberOrOwner(existingStage.projectId, userId);
+    if (!hasAccess) {
+      throw new Error('Acesso negado: você não é proprietário nem colaborador deste projeto');
     }
 
     const deleted = await stageService.deleteStage(stageId);
@@ -392,11 +396,9 @@ export async function handleProjectTools(name: string, args: any, userId?: strin
       throw new Error('projectId, title e content são obrigatórios');
     }
 
-    if (userId) {
-      const hasAccess = await collaboratorService.isMemberOrOwner(projectId, userId);
-      if (!hasAccess) {
-        throw new Error('Acesso negado: você não é proprietário nem colaborador deste projeto');
-      }
+    const hasAccess = await collaboratorService.isMemberOrOwner(projectId, userId);
+    if (!hasAccess) {
+      throw new Error('Acesso negado: você não é proprietário nem colaborador deste projeto');
     }
 
     const log = await updateLogService.createLog({

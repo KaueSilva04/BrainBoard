@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import * as controller from './calendar.controller.js';
+import { authMiddleware } from '../auth/auth.middleware.js';
 
 export const calendarRouter = Router();
+
+// Enforce JWT authentication on appointments and calendar projection routes
+calendarRouter.use('/api/appointments', authMiddleware);
+calendarRouter.use('/api/calendar/events', authMiddleware);
 
 // Appointments CRUD
 calendarRouter.get('/api/appointments', controller.listAppointments);

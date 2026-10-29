@@ -21,9 +21,21 @@ async function resolveEffectiveUserId(userId?: string): Promise<string | undefin
 
 export class CalendarService {
   async getCalendarEvents(filters?: CalendarFilterOptions): Promise<CalendarEventProjection[]> {
-    const aptWhere: any = {};
+    const effectiveUserId = await resolveEffectiveUserId(filters?.userId);
+    if (!effectiveUserId) {
+      // Prevent cross-tenant data leaks when unauthenticated
+      return [];
+    }
+
+    const aptWhere: any = { userId: effectiveUserId };
     const taskWhere: any = { dueDate: { not: null } };
-    const assignmentWhere: any = { dueDate: { not: null } };
+    const assignmentWhere: any = {
+      dueDate: { not: null },
+      OR: [
+        { userId: effectiveUserId },
+        { subject: { userId: effectiveUserId } },
+      ],
+    };
 
     if (filters?.startDate) {
       const start = parseIsoDate(filters.startDate, 'startDate');
@@ -46,20 +58,25 @@ export class CalendarService {
     }
 
     if (filters?.projectId) {
-      taskWhere.stage = { projectId: filters.projectId };
+      taskWhere.stage = {
+        projectId: filters.projectId,
+        project: {
+          OR: [
+            { ownerId: effectiveUserId },
+            { collaborators: { some: { userId: effectiveUserId } } },
+          ],
+        },
+      };
     } else {
-      const effectiveUserId = await resolveEffectiveUserId(filters?.userId);
-      if (effectiveUserId) {
-        taskWhere.stage = {
-          ...taskWhere.stage,
-          project: {
-            OR: [
-              { ownerId: effectiveUserId },
-              { collaborators: { some: { userId: effectiveUserId } } },
-            ],
-          },
-        };
-      }
+      taskWhere.stage = {
+        ...taskWhere.stage,
+        project: {
+          OR: [
+            { ownerId: effectiveUserId },
+            { collaborators: { some: { userId: effectiveUserId } } },
+          ],
+        },
+      };
     }
 
     if (filters?.subjectId) {

@@ -1,7 +1,11 @@
 import { Router } from 'express';
+import { authMiddleware } from '../auth/auth.middleware.js';
 import * as controller from './academic.controller.js';
 
 export const academicRouter = Router();
+
+// Enforce JWT authentication on all academic routes
+academicRouter.use(authMiddleware);
 
 // --- SUBJECTS ---
 academicRouter.get('/subjects', controller.listSubjects);

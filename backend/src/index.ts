@@ -79,6 +79,7 @@ app.use(authRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/users', authRouter);
 app.use(projectsRouter);
+app.use(academicRouter);
 app.use('/api/academic', academicRouter);
 app.use(calendarRouter);
 app.use(dashboardRouter);
@@ -86,7 +87,7 @@ app.use(dashboardRouter);
 // MCP Transports
 app.get('/mcp/sse', async (req, res) => {
   const mcpUser = await resolveMcpUser(req);
-  if (!mcpUser && process.env.REQUIRE_MCP_AUTH === 'true') {
+  if (!mcpUser) {
     return res.status(401).json({ error: 'Autenticação necessária para o servidor MCP' });
   }
   const transport = new SSEServerTransport('/mcp/messages', res as any);

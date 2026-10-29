@@ -5,8 +5,12 @@ import { ValidationError, NotFoundError } from '../shared/errors.js';
 
 export const listAppointments = async (req: Request, res: Response) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Autenticação necessária' });
+    }
     const { startDate, endDate, isCompleted } = req.query;
-    const appointments = await appointmentService.listAppointments({
+    const appointments = await appointmentService.listAppointments(userId, {
       startDate: startDate as string,
       endDate: endDate as string,
       isCompleted: isCompleted !== undefined ? isCompleted === 'true' : undefined,
@@ -22,8 +26,12 @@ export const listAppointments = async (req: Request, res: Response) => {
 
 export const getAppointmentById = async (req: Request, res: Response) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Autenticação necessária' });
+    }
     const id = String(req.params.id);
-    const appointment = await appointmentService.getAppointmentById(id);
+    const appointment = await appointmentService.getAppointmentById(id, userId);
     res.json(appointment);
   } catch (error: any) {
     if (error instanceof ValidationError) {
@@ -38,8 +46,12 @@ export const getAppointmentById = async (req: Request, res: Response) => {
 
 export const createAppointment = async (req: Request, res: Response) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Autenticação necessária' });
+    }
     const { title, startTime, endTime, description, locationOrLink } = req.body;
-    const appointment = await appointmentService.createAppointment({
+    const appointment = await appointmentService.createAppointment(userId, {
       title,
       startTime,
       endTime,
@@ -57,9 +69,13 @@ export const createAppointment = async (req: Request, res: Response) => {
 
 export const updateAppointment = async (req: Request, res: Response) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Autenticação necessária' });
+    }
     const id = String(req.params.id);
     const { title, startTime, endTime, description, locationOrLink, isCompleted } = req.body;
-    const appointment = await appointmentService.updateAppointment(id, {
+    const appointment = await appointmentService.updateAppointment(id, userId, {
       title,
       startTime,
       endTime,
@@ -81,8 +97,12 @@ export const updateAppointment = async (req: Request, res: Response) => {
 
 export const deleteAppointment = async (req: Request, res: Response) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Autenticação necessária' });
+    }
     const id = String(req.params.id);
-    await appointmentService.deleteAppointment(id);
+    await appointmentService.deleteAppointment(id, userId);
     res.status(204).send();
   } catch (error: any) {
     if (error instanceof ValidationError) {
@@ -97,13 +117,17 @@ export const deleteAppointment = async (req: Request, res: Response) => {
 
 export const getCalendarEvents = async (req: Request, res: Response) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Autenticação necessária' });
+    }
     const { startDate, endDate, includeCompleted, projectId } = req.query;
     const events = await calendarService.getCalendarEvents({
       startDate: startDate as string,
       endDate: endDate as string,
       includeCompleted: includeCompleted === 'true',
       projectId: projectId ? String(projectId).trim() : undefined,
-      userId: req.user?.id,
+      userId,
     });
     res.json(events);
   } catch (error: any) {

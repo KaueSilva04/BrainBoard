@@ -8,8 +8,12 @@ import type {
 } from './calendar.types.js';
 
 export class AppointmentService {
-  async listAppointments(filters?: AppointmentFilterOptions) {
-    const where: any = {};
+  async listAppointments(userId: string, filters?: AppointmentFilterOptions) {
+    if (!userId || typeof userId !== 'string') {
+      throw new ValidationError('User ID is required');
+    }
+
+    const where: any = { userId };
 
     if (filters?.startDate) {
       const start = parseIsoDate(filters.startDate, 'startDate');
@@ -31,13 +35,16 @@ export class AppointmentService {
     });
   }
 
-  async getAppointmentById(id: string) {
+  async getAppointmentById(id: string, userId: string) {
     if (!id || typeof id !== 'string') {
       throw new ValidationError('Appointment ID is required');
     }
+    if (!userId || typeof userId !== 'string') {
+      throw new ValidationError('User ID is required');
+    }
 
-    const appointment = await prisma.appointment.findUnique({
-      where: { id },
+    const appointment = await prisma.appointment.findFirst({
+      where: { id, userId },
     });
 
     if (!appointment) {
@@ -47,7 +54,11 @@ export class AppointmentService {
     return appointment;
   }
 
-  async createAppointment(data: CreateAppointmentInput) {
+  async createAppointment(userId: string, data: CreateAppointmentInput) {
+    if (!userId || typeof userId !== 'string') {
+      throw new ValidationError('User ID is required');
+    }
+
     if (!data.title || typeof data.title !== 'string' || !data.title.trim()) {
       throw new ValidationError('Title is required');
     }
@@ -76,16 +87,22 @@ export class AppointmentService {
           data.locationOrLink !== undefined && data.locationOrLink !== null
             ? String(data.locationOrLink).trim()
             : null,
+        userId,
       },
     });
   }
 
-  async updateAppointment(id: string, data: UpdateAppointmentInput) {
+  async updateAppointment(id: string, userId: string, data: UpdateAppointmentInput) {
     if (!id || typeof id !== 'string') {
       throw new ValidationError('Appointment ID is required');
     }
+    if (!userId || typeof userId !== 'string') {
+      throw new ValidationError('User ID is required');
+    }
 
-    const current = await prisma.appointment.findUnique({ where: { id } });
+    const current = await prisma.appointment.findFirst({
+      where: { id, userId },
+    });
     if (!current) {
       throw new NotFoundError('Appointment not found');
     }
@@ -143,9 +160,19 @@ export class AppointmentService {
     }
   }
 
-  async deleteAppointment(id: string) {
+  async deleteAppointment(id: string, userId: string) {
     if (!id || typeof id !== 'string') {
       throw new ValidationError('Appointment ID is required');
+    }
+    if (!userId || typeof userId !== 'string') {
+      throw new ValidationError('User ID is required');
+    }
+
+    const current = await prisma.appointment.findFirst({
+      where: { id, userId },
+    });
+    if (!current) {
+      throw new NotFoundError('Appointment not found');
     }
 
     try {
