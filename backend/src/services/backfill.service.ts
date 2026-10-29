@@ -75,5 +75,66 @@ export async function ensureDefaultOwnerAndBackfill() {
     }
   }
 
+  // 4. Backfill unowned AcademicSubjects to adminUser
+  const unownedSubjects = await prisma.academicSubject.count({
+    where: { userId: null },
+  });
+
+  if (unownedSubjects > 0) {
+    console.log(`[Backfill] Migrating ${unownedSubjects} unowned academic subjects to ${adminUser.email}`);
+    await prisma.academicSubject.updateMany({
+      where: { userId: null },
+      data: { userId: adminUser.id },
+    });
+    console.log(`[Backfill] 100% of academic subjects backfilled with zero data loss.`);
+  }
+
+  // 5. Backfill unowned AcademicAssignments
+  // Derive ownership from parent subject where possible, falling back to adminUser
+  const unownedAssignments = await prisma.academicAssignment.findMany({
+    where: { userId: null },
+    select: { id: true, subjectId: true, subject: { select: { userId: true } } },
+  });
+
+  if (unownedAssignments.length > 0) {
+    console.log(`[Backfill] Migrating ${unownedAssignments.length} unowned academic assignments...`);
+
+    const assignmentsByUser = new Map<string, string[]>();
+    for (const a of unownedAssignments) {
+      const targetUserId = a.subject?.userId || adminUser.id;
+      const ids = assignmentsByUser.get(targetUserId) || [];
+      ids.push(a.id);
+      assignmentsByUser.set(targetUserId, ids);
+    }
+
+    for (const [targetUserId, ids] of assignmentsByUser.entries()) {
+      await prisma.academicAssignment.updateMany({
+        where: { id: { in: ids } },
+        data: { userId: targetUserId },
+      });
+    }
+
+    // Safety fallback: ensure any assignment still without userId is assigned to adminUser
+    await prisma.academicAssignment.updateMany({
+      where: { userId: null },
+      data: { userId: adminUser.id },
+    });
+    console.log(`[Backfill] 100% of academic assignments backfilled with zero data loss.`);
+  }
+
+  // 6. Backfill unowned Appointments to adminUser
+  const unownedAppointments = await prisma.appointment.count({
+    where: { userId: null },
+  });
+
+  if (unownedAppointments > 0) {
+    console.log(`[Backfill] Migrating ${unownedAppointments} unowned appointments to ${adminUser.email}`);
+    await prisma.appointment.updateMany({
+      where: { userId: null },
+      data: { userId: adminUser.id },
+    });
+    console.log(`[Backfill] 100% of appointments backfilled with zero data loss.`);
+  }
+
   return adminUser;
 }

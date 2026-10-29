@@ -653,10 +653,16 @@ const AppContent: React.FC = () => {
   );
 };
 
+const AuthenticatedAppContent: React.FC = () => {
+  const { user } = useAuth();
+  return <AppContent key={user?.id ?? 'anonymous'} />;
+};
+
 export const App: React.FC = () => {
   return (
     <AuthProvider>
-      <AppContent />
+      <AuthenticatedAppContent />
     </AuthProvider>
   );
 };
+

@@ -49,9 +49,12 @@ model User {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 
-  ownedProjects      Project[]       @relation("ProjectOwner")
-  projectMemberships ProjectMember[]
-  assignedTasks      Task[]          @relation("TaskAssignee")
+  ownedProjects       Project[]            @relation("ProjectOwner")
+  projectMemberships  ProjectMember[]
+  assignedTasks       Task[]               @relation("TaskAssignee")
+  appointments        Appointment[]
+  academicSubjects    AcademicSubject[]
+  academicAssignments AcademicAssignment[]
 }
 
 model ProjectMember {
@@ -184,6 +187,11 @@ model Appointment {
   isCompleted    Boolean   @default(false)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+
+  userId         String?
+  user           User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 enum AssignmentType {
@@ -210,7 +218,12 @@ model AcademicSubject {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   assignments AcademicAssignment[]
+
+  @@index([userId])
 }
 
 model AcademicAssignment {
@@ -223,6 +236,10 @@ model AcademicAssignment {
   grade       Float?
   subjectId   String
   subject     AcademicSubject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
+
+  @@index([userId])
 }

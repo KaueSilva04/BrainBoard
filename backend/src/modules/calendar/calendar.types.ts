@@ -19,6 +19,7 @@ export interface AppointmentFilterOptions {
   startDate?: Date | string | undefined;
   endDate?: Date | string | undefined;
   isCompleted?: boolean | undefined;
+  userId?: string | undefined;
 }
 
 export interface CalendarEventProjection {

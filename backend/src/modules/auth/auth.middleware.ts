@@ -67,7 +67,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     const allowAnonymous = process.env.ALLOW_ANONYMOUS_DEV === 'true';
     const isMcpRoute = req.path.startsWith('/mcp') || req.baseUrl.startsWith('/mcp');
 
-    if (allowAnonymous || isMcpRoute) {
+    if (allowAnonymous && !isMcpRoute) {
       const fallbackUser = await getFallbackAdminUser();
       if (fallbackUser) {
         req.user = fallbackUser;
@@ -115,7 +115,8 @@ export async function optionalAuthMiddleware(req: Request, res: Response, next: 
       }
     }
 
-    if (!req.user && process.env.ALLOW_ANONYMOUS_DEV === 'true') {
+    const isMcpRoute = req.path.startsWith('/mcp') || req.baseUrl.startsWith('/mcp');
+    if (!isMcpRoute && !req.user && process.env.ALLOW_ANONYMOUS_DEV === 'true') {
       const fallbackUser = await getFallbackAdminUser();
       if (fallbackUser) {
         req.user = fallbackUser;
@@ -132,8 +133,5 @@ export async function resolveMcpUser(req: Request): Promise<AuthUser | null> {
   if (req.user) {
     return req.user;
   }
-  if (process.env.REQUIRE_MCP_AUTH === 'true') {
-    return null;
-  }
-  return await getFallbackAdminUser();
+  return null;
 }
