@@ -52,7 +52,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [selectedStageId, setSelectedStageId] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<TaskStatus | 'ALL'>('ALL');
   const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>('ALL');
-  const [selectedTag, setSelectedTag] = useState<string>('ALL');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [onlyFocus, setOnlyFocus] = useState<boolean>(false);
 
   useEffect(() => {
@@ -82,10 +82,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         return false;
       }
       if (onlyFocus && !t.isSprintActive) return false;
-      if (selectedTag !== 'ALL' && !getTaskTags(t).includes(selectedTag)) return false;
+      if (selectedTags.length > 0 && !getTaskTags(t).some((tag) => selectedTags.includes(tag))) return false;
       return true;
     });
-  }, [tasks, selectedStageId, selectedStatus, selectedAssigneeId, onlyFocus, selectedTag]);
+  }, [tasks, selectedStageId, selectedStatus, selectedAssigneeId, onlyFocus, selectedTags]);
 
   const visibleStages = useMemo(() => {
     if (selectedStageId === 'ALL') return stages;
@@ -96,15 +96,21 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     (selectedStageId !== 'ALL' ? 1 : 0) +
     (selectedStatus !== 'ALL' ? 1 : 0) +
     (selectedAssigneeId !== 'ALL' ? 1 : 0) +
-    (selectedTag !== 'ALL' ? 1 : 0) +
+    selectedTags.length +
     (onlyFocus ? 1 : 0);
 
   const clearFilters = () => {
     setSelectedStageId('ALL');
     setSelectedStatus('ALL');
     setSelectedAssigneeId('ALL');
-    setSelectedTag('ALL');
+    setSelectedTags([]);
     setOnlyFocus(false);
+  };
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags((current) =>
+      current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag]
+    );
   };
 
   const todoTasks = filteredTasks.filter((t) => t.status === 'TODO');
@@ -240,21 +246,25 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               <span>Em Foco</span>
             </button>
 
-            {/* Tag Selector */}
+            {/* Multi-select tag filters */}
             {availableTags.length > 0 && (
-              <select
-                aria-label="Filtrar por etiqueta"
-                value={selectedTag}
-                onChange={(e) => setSelectedTag(e.target.value)}
-                className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              >
-                <option value="ALL">Todas as etiquetas</option>
+              <div className="flex flex-wrap items-center gap-1.5" aria-label="Filtrar por etiquetas">
                 {availableTags.map((tag) => (
-                  <option key={tag} value={tag}>
-                    #{tag}
-                  </option>
+                  <button
+                    key={tag}
+                    type="button"
+                    aria-pressed={selectedTags.includes(tag)}
+                    onClick={() => toggleTag(tag)}
+                    className={`h-7 rounded-full border px-2.5 text-[11px] font-semibold transition-colors ${
+                      selectedTags.includes(tag)
+                        ? 'border-indigo-500 bg-indigo-600 text-white dark:border-indigo-400 dark:bg-indigo-500 dark:text-white'
+                        : 'border-indigo-200 bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900 dark:bg-indigo-950/50 dark:text-indigo-300 dark:hover:bg-indigo-900/60'
+                    }`}
+                  >
+                    {tag}
+                  </button>
                 ))}
-              </select>
+              </div>
             )}
           </div>
 
