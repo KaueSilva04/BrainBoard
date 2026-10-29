@@ -203,3 +203,36 @@ html.dark {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--bb-scroll-thumb-hover);
 }
+
+
+.bb-top-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bb-scroll-thumb) var(--bb-scroll-track);
+}
+
+.bb-top-scrollbar::-webkit-scrollbar {
+  height: 10px;
+}
+
+.bb-top-scrollbar::-webkit-scrollbar-track {
+  background: var(--bb-scroll-track);
+  border-radius: 9999px;
+}
+
+.bb-top-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--bb-scroll-thumb);
+  border-radius: 9999px;
+}
+
+.bb-top-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--bb-scroll-thumb-hover);
+}
+
+.bb-hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.bb-hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}

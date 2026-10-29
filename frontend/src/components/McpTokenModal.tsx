@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { KeyRound, X, Copy, Check, Loader2 } from 'lucide-react';
 import { useAccessibleModal } from '../hooks/useAccessibleModal';
 import { authApi } from '../services/api';
@@ -56,7 +57,7 @@ export const McpTokenModal: React.FC<McpTokenModalProps> = ({ isOpen, onClose })
     }
   };
 
-  return (
+  const modalContent = (
     <div
       className="bb-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
       onClick={onClose}
@@ -191,4 +192,6 @@ export const McpTokenModal: React.FC<McpTokenModalProps> = ({ isOpen, onClose })
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
 };

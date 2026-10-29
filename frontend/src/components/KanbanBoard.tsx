@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Plus, Milestone, Users, Filter, X, Flame } from 'lucide-react';
 import type { Project, Stage, Task, TaskStatus, ProjectCollaborator } from '../types';
 import { TASK_STATUS_LABELS, getTaskTags } from '../types';
@@ -58,6 +58,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [onlyFocus, setOnlyFocus] = useState<boolean>(false);
   const [isFiltersOpen, setIsFiltersOpen] = useState<boolean>(false);
 
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const boardScrollRef = useRef<HTMLDivElement>(null);
+  const isSyncingScrollRef = useRef<'top' | 'board' | null>(null);
+  const [scrollContentWidth, setScrollContentWidth] = useState<number>(0);
+
   useEffect(() => {
     if (stages.length === 0) setBoardView('STAGES');
   }, [stages.length]);
@@ -95,6 +100,55 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     return stages.filter((s) => s.id === selectedStageId);
   }, [stages, selectedStageId]);
 
+  const updateScrollMetrics = useCallback(() => {
+    const boardEl = boardScrollRef.current;
+    if (!boardEl) return;
+    setScrollContentWidth(boardEl.scrollWidth);
+  }, []);
+
+  useEffect(() => {
+    if (boardView !== 'STAGES') return;
+    updateScrollMetrics();
+    const boardEl = boardScrollRef.current;
+    if (!boardEl) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateScrollMetrics();
+    });
+    resizeObserver.observe(boardEl);
+    Array.from(boardEl.children).forEach((child) => resizeObserver.observe(child));
+    window.addEventListener('resize', updateScrollMetrics);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateScrollMetrics);
+    };
+  }, [boardView, visibleStages, filteredTasks.length, updateScrollMetrics]);
+
+  const handleTopScroll = () => {
+    if (isSyncingScrollRef.current === 'board') {
+      isSyncingScrollRef.current = null;
+      return;
+    }
+    const topEl = topScrollRef.current;
+    const boardEl = boardScrollRef.current;
+    if (!topEl || !boardEl) return;
+    isSyncingScrollRef.current = 'top';
+    boardEl.scrollLeft = topEl.scrollLeft;
+  };
+
+  const handleBoardScroll = () => {
+    if (isSyncingScrollRef.current === 'top') {
+      isSyncingScrollRef.current = null;
+      return;
+    }
+    const topEl = topScrollRef.current;
+    const boardEl = boardScrollRef.current;
+    if (!topEl || !boardEl) return;
+    isSyncingScrollRef.current = 'board';
+    topEl.scrollLeft = boardEl.scrollLeft;
+  };
+
   const activeFiltersCount =
     (selectedStageId !== 'ALL' ? 1 : 0) +
     (selectedStatus !== 'ALL' ? 1 : 0) +
@@ -125,7 +179,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   return (
     <div className="flex flex-col gap-8 bb-page-enter motion-reduce:animate-none">
       {/* Dashboard Overview Metrics Section */}
-      {searchQuery.trim() && <p className="-mb-6 break-words text-sm text-slate-600 dark:text-slate-300 [overflow-wrap:anywhere]">A busca filtra somente os cartões do quadro; os indicadores abaixo consideram todas as tarefas do projeto.</p>}
+      {searchQuery.trim() && (
+        <p className="-mb-6 break-words text-sm text-slate-600 dark:text-slate-300 [overflow-wrap:anywhere]">
+          A busca filtra somente os cartões do quadro; os indicadores abaixo consideram todas as tarefas do projeto.
+        </p>
+      )}
       <DashboardOverview tasks={summaryTasks} compactMobile />
 
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
@@ -134,9 +192,35 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Visualize o fluxo por status ou por etapa.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div aria-label="Agrupar tarefas" className="inline-flex rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-0.5">
-            <button type="button" onClick={() => setBoardView('STATUS')} disabled={stages.length === 0} aria-pressed={boardView === 'STATUS'} className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${boardView === 'STATUS' ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'}`}>Por status</button>
-            <button type="button" onClick={() => setBoardView('STAGES')} aria-pressed={boardView === 'STAGES'} className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${boardView === 'STAGES' ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'}`}>Por etapa</button>
+          <div
+            aria-label="Agrupar tarefas"
+            className="inline-flex rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-0.5"
+          >
+            <button
+              type="button"
+              onClick={() => setBoardView('STATUS')}
+              disabled={stages.length === 0}
+              aria-pressed={boardView === 'STATUS'}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                boardView === 'STATUS'
+                  ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+              }`}
+            >
+              Por status
+            </button>
+            <button
+              type="button"
+              onClick={() => setBoardView('STAGES')}
+              aria-pressed={boardView === 'STAGES'}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                boardView === 'STAGES'
+                  ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+              }`}
+            >
+              Por etapa
+            </button>
           </div>
           {stages.length > 0 && (
             <button
@@ -260,7 +344,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
               }`}
             >
-              <Flame className={`h-3.5 w-3.5 ${onlyFocus ? 'fill-amber-500 text-amber-600 dark:text-amber-400' : 'text-slate-400'}`} />
+              <Flame
+                className={`h-3.5 w-3.5 ${
+                  onlyFocus ? 'fill-amber-500 text-amber-600 dark:text-amber-400' : 'text-slate-400'
+                }`}
+              />
               <span>Em Foco</span>
             </button>
 
@@ -343,51 +431,67 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             )}
           </div>
         ) : (
-          <div className="flex flex-nowrap items-start gap-5 overflow-x-auto pb-4 snap-x">
-            {visibleStages.map((stage) => {
-              const stageTasks = filteredTasks.filter((t) => t.stageId === stage.id);
-              return (
-                <div key={stage.id} className="w-[330px] sm:w-[360px] shrink-0 snap-start">
-                  <StageColumn
-                    stage={stage}
-                    stages={stages}
-                    tasks={stageTasks}
-                    collaborators={collaborators}
-                    onMoveTask={onMoveTask}
-                    onMoveTaskToStage={onMoveTaskToStage}
-                    onUpdateTaskTags={onUpdateTaskTags}
-                    onDeleteTask={onDeleteTask}
-                    onDeleteStage={onDeleteStage}
-                    onAddSubtask={onAddSubtask}
-                    onToggleSubtask={onToggleSubtask}
-                    onDeleteSubtask={onDeleteSubtask}
-                    onOpenCreateTaskForStage={handleCreateTaskTrigger}
-                    onTaskUpdated={onTaskUpdated}
-                  />
-                </div>
-              );
-            })}
+          <div className="flex flex-col gap-3">
+            {/* Top Synchronized Horizontal Scrollbar */}
+            <div
+              ref={topScrollRef}
+              onScroll={handleTopScroll}
+              aria-label="Barra de rolagem horizontal das etapas"
+              className="bb-top-scrollbar w-full overflow-x-auto py-0.5"
+            >
+              <div style={{ width: `${scrollContentWidth}px`, height: '1px' }} />
+            </div>
 
-            {/* Quick Add Stage Column Card */}
-            {onOpenCreateStage && (
-              <button
-                type="button"
-                onClick={onOpenCreateStage}
-                className="group flex w-[330px] sm:w-[360px] shrink-0 snap-start self-start flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white/50 p-6 text-center transition-colors hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/50 dark:hover:border-slate-600 dark:hover:bg-slate-800/50 min-h-[280px]"
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors group-hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:group-hover:text-slate-100">
-                  <Plus className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-slate-700 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-100">
-                    Adicionar Nova Etapa
-                  </p>
-                  <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-400">
-                    Clique para criar mais um marco no projeto
-                  </p>
-                </div>
-              </button>
-            )}
+            <div
+              ref={boardScrollRef}
+              onScroll={handleBoardScroll}
+              className="bb-hide-scrollbar flex flex-nowrap items-start gap-5 overflow-x-auto pb-4 snap-x"
+            >
+              {visibleStages.map((stage) => {
+                const stageTasks = filteredTasks.filter((t) => t.stageId === stage.id);
+                return (
+                  <div key={stage.id} className="w-[330px] sm:w-[360px] shrink-0 snap-start">
+                    <StageColumn
+                      stage={stage}
+                      stages={stages}
+                      tasks={stageTasks}
+                      collaborators={collaborators}
+                      onMoveTask={onMoveTask}
+                      onMoveTaskToStage={onMoveTaskToStage}
+                      onUpdateTaskTags={onUpdateTaskTags}
+                      onDeleteTask={onDeleteTask}
+                      onDeleteStage={onDeleteStage}
+                      onAddSubtask={onAddSubtask}
+                      onToggleSubtask={onToggleSubtask}
+                      onDeleteSubtask={onDeleteSubtask}
+                      onOpenCreateTaskForStage={handleCreateTaskTrigger}
+                      onTaskUpdated={onTaskUpdated}
+                    />
+                  </div>
+                );
+              })}
+
+              {/* Quick Add Stage Column Card */}
+              {onOpenCreateStage && (
+                <button
+                  type="button"
+                  onClick={onOpenCreateStage}
+                  className="group flex w-[330px] sm:w-[360px] shrink-0 snap-start self-start flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white/50 p-6 text-center transition-colors hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/50 dark:hover:border-slate-600 dark:hover:bg-slate-800/50 min-h-[280px]"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors group-hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:group-hover:text-slate-100">
+                    <Plus className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-slate-700 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-100">
+                      Adicionar Nova Etapa
+                    </p>
+                    <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-400">
+                      Clique para criar mais um marco no projeto
+                    </p>
+                  </div>
+                </button>
+              )}
+            </div>
           </div>
         )
       ) : (
@@ -439,7 +543,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           />
         </div>
       )}
-
     </div>
   );
 };
